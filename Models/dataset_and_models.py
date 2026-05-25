@@ -19,9 +19,19 @@ class Dataset(Enum):
     
 class Model(Enum):
     RANDOM_FOREST_REGRESSOR = "random_forest_regressor"
+    PYTORCH_NEURAL_NETWORK = "pytorch_neural_network"
     
     def get_model(self):
+        from Models.trainers import SklearnTrainer, PytorchTrainer
         if self == Model.RANDOM_FOREST_REGRESSOR:
-            return RandomForestRegressor(random_state=42)
+            return SklearnTrainer(RandomForestRegressor(random_state=42))
+        elif self == Model.PYTORCH_NEURAL_NETWORK:
+            return PytorchTrainer()
         else:
             raise ValueError(f"Unknown model: {self.value}")
+    def get_models(pytorch: bool = False) -> list:
+        if pytorch:
+            return [Model.PYTORCH_NEURAL_NETWORK]
+        else:
+            return [model for model in Model if model != Model.PYTORCH_NEURAL_NETWORK]
+    
