@@ -32,12 +32,13 @@ Excluded (tree-specific only): `woodelf`, `fastTreeSHAP`, `GPUTreeSHAP`.
 
 Stored in `Datasets/`:
 
-| Dataset | Task | Samples | Features | Correlation | Source |
-|---|---|---|---|---|---|
-| Census Income (Adult) | Classification | ~32k | 13 | Moderate | [UCI](https://archive.ics.uci.edu/dataset/20/census+income) |
-| Superconductivity | Regression | ~21k | 81 | High | [UCI](https://archive.ics.uci.edu/dataset/464/superconductivty+data) |
+| Dataset | Task | Samples | Features | Source |
+|---|---|---|---|---|
+| California Housing | Regression | 20,640 | 8 | `sklearn.datasets` |
+| Ames Housing | Regression | 1,460 | ~79 | OpenML #42165 |
+| Forest Covertype | Classification | 50,000* | 54 | `sklearn.datasets` |
 
-The Superconductivity dataset is intentionally high-correlation — useful for stressing conditional vs. marginal methods (`shapr` vs. `shap`/`shapiq`).
+\* Stratified subsample of the full 581k-row dataset for faster experimentation.
 
 ## Setup
 
@@ -89,8 +90,9 @@ Libraries/
   dalex.ipynb             # iBreakDown, PDP, variable importance
   shapleyflow.ipynb       # Graph-based path-decomposed Shapley values
 Models/
-  dataset_and_models.py   # Dataset and model enums / definitions
-  load_and_train.py       # Train models on each dataset
+  dataset_and_models.py   # Dataset and Model enums / definitions
+  trainers.py             # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
+  load_and_train.py       # TrainingConfig — pairs a dataset with a model and exposes train()
 Datasets/
   load_datasets.py        # Dataset download and caching helpers
   dataset.md              # Dataset documentation
