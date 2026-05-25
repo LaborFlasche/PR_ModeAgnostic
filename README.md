@@ -53,10 +53,16 @@ uv sync
 
 This creates a `.venv` and installs all dependencies from `uv.lock` in one step.
 
-To activate the environment manually (e.g. for running scripts outside Jupyter):
+### Run notebooks
 
 ```bash
-source .venv/bin/activate
+Go to the notebook and run it using the venv from uv.
+```
+
+### Run scripts
+
+```bash
+uv run Models/load_and_train.py
 ```
 
 ### shapr (optional)
@@ -82,9 +88,12 @@ Libraries/
   alibi.ipynb             # Production XAI — counterfactuals, anchors
   dalex.ipynb             # iBreakDown, PDP, variable importance
   shapleyflow.ipynb       # Graph-based path-decomposed Shapley values
+Models/
+  dataset_and_models.py   # Dataset and model enums / definitions
+  load_and_train.py       # Train models on each dataset
 Datasets/
   load_datasets.py        # Dataset download and caching helpers
   dataset.md              # Dataset documentation
-pyproject.toml
-uv.lock
+pyproject.toml            # Project metadata and dependencies
+uv.lock                   # Locked dependency versions (commit this)
 ```
