@@ -41,17 +41,32 @@ The Superconductivity dataset is intentionally high-correlation — useful for s
 
 ## Setup
 
+### Prerequisites
+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — Python package manager
+
+### Install
+
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate
-uv pip install -r requirements.txt
+uv sync
 ```
 
+This creates a `.venv` and installs all dependencies from `uv.lock` in one step.
+
+To activate the environment manually (e.g. for running scripts outside Jupyter):
+
+```bash
+source .venv/bin/activate
+```
+
+### shapr (optional)
+
 **shapr** requires R in addition to the Python wrapper:
+
 ```bash
 # Install R >= 4.3 via https://cran.r-project.org, then:
 Rscript -e "install.packages('shapr')"
-uv pip install shaprpy rpy2
+uv add shaprpy rpy2
 ```
 
 ## Project structure
@@ -70,5 +85,6 @@ Libraries/
 Datasets/
   load_datasets.py        # Dataset download and caching helpers
   dataset.md              # Dataset documentation
-requirements.txt
+pyproject.toml
+uv.lock
 ```
