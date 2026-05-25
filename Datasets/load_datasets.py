@@ -34,13 +34,13 @@ def load_ames_housing() -> dict:
     the data without extra preprocessing.  Missing values are imputed with the
     column median (numeric) or mode (categorical).
     """
-    bunch = fetch_openml("house_prices", version=3, as_frame=True, parser="auto")
+    bunch = fetch_openml(data_id=42165, as_frame=True, parser="auto")
     df: pd.DataFrame = bunch.frame.copy()
 
     # Drop the id column if present
     df = df.drop(columns=["Id"], errors="ignore")
 
-    target_col = "SalePrice"
+    target_col = bunch.target_names[0]
     feature_cols = [c for c in df.columns if c != target_col]
 
     X = df[feature_cols].copy()
@@ -48,7 +48,7 @@ def load_ames_housing() -> dict:
 
     # Impute and encode
     for col in X.columns:
-        if X[col].dtype.name in ("object", "category"):
+        if not pd.api.types.is_numeric_dtype(X[col]):
             X[col] = X[col].fillna(X[col].mode().iloc[0])
             X[col] = X[col].astype("category").cat.codes
         else:
@@ -100,3 +100,9 @@ def load_all() -> dict[str, dict]:
         "ames": load_ames_housing(),
         "covertype": load_covertype(),
     }
+
+
+if __name__ == "__main__":
+    datasets = load_all()
+    for name, data in datasets.items():
+        print(f"{name}: {data['X'].shape[0]} samples, {data['X'].shape[1]} features")
