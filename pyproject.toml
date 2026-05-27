@@ -10,10 +10,20 @@ name = "pr-modeagnostic"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
+    "alibi[shap]>=0.9.6",
     "captum>=0.9.0",
-    "pandas>=3.0.3",
+    "click>=8.4.1",
+    "graphviz>=0.21",
+    "pandas>=2.0.0",
+    "pygraphviz>=1.14",
     "scikit-learn>=1.8.0",
+    "shapflow>=0.0.1",
     "torch>=2.12.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
 ]
