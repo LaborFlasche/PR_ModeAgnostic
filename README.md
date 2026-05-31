@@ -30,15 +30,58 @@ Excluded (tree-specific only): `woodelf`, `fastTreeSHAP`, `GPUTreeSHAP`.
 
 ## Datasets
 
-Stored in `Datasets/`:
+Stored in `Datasets/`. See `Datasets/dataset.md` for full details on feature encoding and the feature-selection strategy used for experiments.
 
 | Dataset | Task | Samples | Features | Source |
 |---|---|---|---|---|
 | California Housing | Regression | 20,640 | 8 | `sklearn.datasets` |
 | Ames Housing | Regression | 1,460 | ~79 | OpenML #42165 |
 | Forest Covertype | Classification | 50,000* | 54 | `sklearn.datasets` |
+| Adult Census | Classification | 48,842 | 14 | OpenML #1590 |
+| Gisette | Classification | 7,000 | 5,000 | OpenML #41026 |
 
 \* Stratified subsample of the full 581k-row dataset for faster experimentation.
+
+## Benchmark configuration
+
+Model hyperparameters and dataset sweep ranges are defined in `config.yaml`. Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand them into all benchmark combinations:
+
+```python
+from itertools import product
+from sklearn.model_selection import ParameterGrid
+from Models.config_parser import load_config, load_dataset_config
+from Models.dataset_and_models import Dataset
+
+CONFIG = "config.yaml"
+
+model_config   = load_config(CONFIG)        # {model_key: {param: [values]}}
+dataset_config = load_dataset_config(CONFIG) # {dataset_key: {n_features: [...], n_samples: [...]}}
+
+# All model × hyperparameter combinations
+model_runs = [
+    (model_key, params)
+    for model_key, param_grid in model_config.items()
+    for params in ParameterGrid(param_grid)
+]
+
+# All dataset × (n_features, n_samples) combinations
+dataset_runs = [
+    (dataset_key, params)
+    for dataset_key, param_grid in dataset_config.items()
+    for params in ParameterGrid(param_grid)
+]
+
+# Full cross-product: one entry per benchmark run
+benchmark_runs = list(product(model_runs, dataset_runs))
+print(f"{len(model_runs)} model configs × {len(dataset_runs)} dataset configs = {len(benchmark_runs)} total runs")
+
+# Load a single dataset variant
+dataset_key, dataset_params = dataset_runs[0]
+ds = Dataset[dataset_key.upper()].load_dataset(**dataset_params)
+X, y = ds["X"], ds["y"]
+```
+
+Features within each dataset are reduced by ranking on variance (`VarianceThreshold`) and keeping the top `n_features`; samples are drawn randomly with `random_state=42`.
 
 ## Setup
 
@@ -92,10 +135,12 @@ Libraries/
 Models/
   dataset_and_models.py   # Dataset and Model enums / definitions
   trainers.py             # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
+  config_parser.py        # load_config / load_dataset_config — expand config.yaml into parameter lists
   load_and_train.py       # TrainingConfig — pairs a dataset with a model and exposes train()
 Datasets/
-  load_datasets.py        # Dataset download and caching helpers
-  dataset.md              # Dataset documentation
+  load_datasets.py        # Dataset download and caching helpers (support n_features / n_samples)
+  dataset.md              # Dataset documentation incl. encoding strategy and feature-selection notes
+config.yaml               # Hyperparameter grids for models and sweep ranges for datasets
 pyproject.toml            # Project metadata and dependencies
 uv.lock                   # Locked dependency versions (commit this)
 ```
