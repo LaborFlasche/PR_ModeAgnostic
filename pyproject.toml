@@ -19,6 +19,8 @@ dependencies = [
     "pandas>=2.0.0",
     "pygraphviz>=1.14",
     "scikit-learn>=1.8.0",
+    "shap>=0.51.0",
+    "shapiq>=1.4.1",
     "shapflow>=0.0.1",
     "torch>=2.12.0",
 ]
