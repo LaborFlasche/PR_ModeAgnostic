@@ -26,7 +26,7 @@ class SklearnTrainer(ModelTrainer):
 
 
 class PytorchTrainer(ModelTrainer):
-    _EPOCHS = 20
+    _EPOCHS = 2       # full training: 20
     _LR = 1e-3
     _BATCH_SIZE = 64
     _HIDDEN_SIZE = 64
