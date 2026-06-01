@@ -21,3 +21,11 @@ dependencies = [
     "shapiq>=1.4.1",
     "torch>=2.12.0",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
