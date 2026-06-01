@@ -1000,11 +1000,6 @@ dependencies = [
     { name = "torch" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -1015,14 +1010,12 @@ requires-dist = [
     { name = "captum", specifier = ">=0.9.0" },
     { name = "lightshap", specifier = ">=0.1.12" },
     { name = "pandas", specifier = ">=3.0.3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "shap", specifier = ">=0.51.0" },
     { name = "shapiq", specifier = ">=1.4.1" },
     { name = "torch", specifier = ">=2.12.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.3" }]
