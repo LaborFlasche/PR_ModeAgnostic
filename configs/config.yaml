@@ -28,50 +28,50 @@ models:
 datasets:
   california_housing:
     n_features:
-      min: 1
+      min: 4
       max: 8
-      step: 1
+      step: 2
     n_samples:
-      min: 2000
-      max: 20000
-      step: 2000
+      min: 200
+      max: 20200
+      step: 10000
 
   ames_housing:
     n_features:
-      min: 1
+      min: 4
       max: 79
-      step: 10
+      step: 15
     n_samples:
       min: 200
       max: 1400
-      step: 200
+      step: 400
 
   covertype:
     n_features:
-      min: 1
+      min: 4
       max: 54
-      step: 5
+      step: 25
     n_samples:
-      min: 10000
-      max: 50000
-      step: 10000
+      min: 200
+      max: 40200
+      step: 20000
 
   adult_census:
     n_features:
-      min: 1
+      min: 4
       max: 14
-      step: 2
+      step: 5
     n_samples:
-      min: 5000
-      max: 45000
-      step: 5000
+      min: 200
+      max: 40200
+      step: 20000
 
   gisette:
     n_features:
-      min: 1
+      min: 4
       max: 5000
-      step: 500
+      step: 999
     n_samples:
-      min: 1000
-      max: 7000
-      step: 1000
+      min: 200
+      max: 6020
+      step: 3000
