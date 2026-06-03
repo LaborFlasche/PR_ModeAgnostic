@@ -10,7 +10,7 @@ class ShapTrueValueBackend(BaseBackend):
     computation_type = "true_value"
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
-        explainer = shap.TreeExplainer(self.model)
+        explainer = shap.Explainer(self.model, self.background)
         sv = explainer(x)
         values = sv.values
         if values.ndim == 3:
