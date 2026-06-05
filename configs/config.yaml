@@ -6,13 +6,13 @@ benchmark:
   # The main runtime lever. The averaged accuracy metrics stabilise after a few
   # hundred points, so a small value keeps representativeness while cutting runtime
   # drastically. Use null to explain every remaining row.
-  n_eval: 100
+  n_eval: 50
   # Approximation sweep: only the selected (library × approximator × budget)
   # combinations are run. Budget units differ across libraries — the recorded
   # n_model_evals is the comparable axis.
   libraries: [shap, shapiq, lightshap]
   approximators: [kernel, permutation]
-  budgets: [128]
+  budgets: [64]
 
 models:
   random_forest:
@@ -56,7 +56,7 @@ datasets:
     n_features:
       min: 4
       max: 79
-      step: 15
+      step: 25
     n_samples:
       min: 1000
       max: 1000
@@ -86,7 +86,7 @@ datasets:
     n_features:
       min: 4
       max: 5000
-      step: 999
+      step: 2048
     n_samples:
       min: 1000
       max: 1000
