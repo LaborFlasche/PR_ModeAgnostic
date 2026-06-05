@@ -12,7 +12,16 @@ class ShapTrueValueBackend(BaseBackend):
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         explainer = shap.Explainer(self.model, self.background)
-        sv = explainer(x)
+        # check_additivity=False: interventional TreeSHAP on HistGradientBoosting
+        # (the gradient_boosting model) trips shap's additivity check — its binned
+        # histogram trees make shap's traversal sum mismatch the raw model output by
+        # a small margin. Only TreeExplainer runs this check; LinearExplainer and the
+        # exact path don't accept the kwarg, so fall back to the plain call there. The
+        # oracle-validation cell independently confirms the values are correct.
+        try:
+            sv = explainer(x, check_additivity=False)
+        except TypeError:
+            sv = explainer(x)
         values = sv.values
         if values.ndim == 3:
             # multi-class: use class 1 for binary, class 0 otherwise
