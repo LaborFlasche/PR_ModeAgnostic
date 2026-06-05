@@ -1,3 +1,19 @@
+benchmark:
+  # Number of rows used as the imputer background / reference set (defines the
+  # marginal value function). Cost per explanation scales with this;
+  n_background: 50
+  # Number of instances actually explained and averaged per (model, dataset) cell.
+  # The main runtime lever. The averaged accuracy metrics stabilise after a few
+  # hundred points, so a small value keeps representativeness while cutting runtime
+  # drastically. Use null to explain every remaining row.
+  n_eval: 100
+  # Approximation sweep: only the selected (library × approximator × budget)
+  # combinations are run. Budget units differ across libraries — the recorded
+  # n_model_evals is the comparable axis.
+  libraries: [shap, shapiq, lightshap]
+  approximators: [kernel, permutation]
+  budgets: [128]
+
 models:
   random_forest:
     n_estimators: [5]
@@ -32,9 +48,9 @@ datasets:
       max: 8
       step: 2
     n_samples:
-      min: 200
-      max: 20200
-      step: 10000
+      min: 1000
+      max: 1000
+      step: 1
 
   ames_housing:
     n_features:
@@ -42,9 +58,9 @@ datasets:
       max: 79
       step: 15
     n_samples:
-      min: 200
-      max: 1400
-      step: 400
+      min: 1000
+      max: 1000
+      step: 1
 
   covertype:
     n_features:
@@ -52,9 +68,9 @@ datasets:
       max: 54
       step: 25
     n_samples:
-      min: 200
-      max: 40200
-      step: 20000
+      min: 1000
+      max: 1000
+      step: 1
 
   adult_census:
     n_features:
@@ -62,9 +78,9 @@ datasets:
       max: 14
       step: 5
     n_samples:
-      min: 200
-      max: 40200
-      step: 20000
+      min: 1000
+      max: 1000
+      step: 1
 
   gisette:
     n_features:
@@ -72,6 +88,6 @@ datasets:
       max: 5000
       step: 999
     n_samples:
-      min: 200
-      max: 6020
-      step: 3000
+      min: 1000
+      max: 1000
+      step: 1
