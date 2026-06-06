@@ -15,11 +15,13 @@ class BenchmarkRunner:
         output_csv: str,
         n_background: int = 100,
         n_eval: int | None = None,
+        compare_with_reference: bool = True,
     ):
         self.backends = backends
         self.output_csv = output_csv
         self.n_background = n_background
         self.n_eval = n_eval
+        self.compare_with_reference = compare_with_reference
 
     def run(self, model, X: pd.DataFrame, run_meta: dict) -> None:
         if len(X) <= self.n_background:
@@ -45,17 +47,22 @@ class BenchmarkRunner:
         rows = []
         for cls in self.backends:
             name = cls.name
-            ref_name = self._resolve_reference(cls)
+            chosen_method = getattr(instances[name], "chosen_method", None)
 
-            if ref_name is not None and ref_name in contributions:
-                ref = contributions[ref_name]
-                cur = contributions[name]
-                mad = mean_abs_diff(cur, ref)
-                sa = sign_agreement(cur, ref)
-                msr = mean_sample_rho(cur, ref)
+            if self.compare_with_reference:
+                ref_name = self._resolve_reference(cls)
+                if ref_name is not None and ref_name in contributions:
+                    ref = contributions[ref_name]
+                    cur = contributions[name]
+                    mad = mean_abs_diff(cur, ref)
+                    sa = sign_agreement(cur, ref)
+                    msr = mean_sample_rho(cur, ref)
+                else:
+                    if ref_name is not None:
+                        print(f"Warning: reference backend '{ref_name}' not in run — accuracy metrics NaN for '{name}'")
+                    mad = sa = msr = float("nan")
             else:
-                if ref_name is not None:
-                    print(f"Warning: reference backend '{ref_name}' not in run — accuracy metrics NaN for '{name}'")
+                ref_name = None
                 mad = sa = msr = float("nan")
 
             rows.append({
@@ -63,6 +70,7 @@ class BenchmarkRunner:
                 "backend": name,
                 "library": cls.library,
                 "computation_type": cls.computation_type,
+                "chosen_method": chosen_method if chosen_method is not None else float("nan"),
                 "n_eval": len(X_eval),
                 "runtime_s": round(runtimes[name], 4),
                 "mean_abs_diff": mad,
@@ -79,6 +87,10 @@ class BenchmarkRunner:
         if backend_cls.computation_type == "approximation":
             for cls in self.backends:
                 if cls.library == backend_cls.library and cls.computation_type == "true_value":
+                    return cls.name
+            # Fall back to shap true_value as the universal ground truth
+            for cls in self.backends:
+                if cls.library == "shap" and cls.computation_type == "true_value":
                     return cls.name
             return None
         # true_value, non-shap: reference is shap true_value

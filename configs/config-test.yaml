@@ -7,7 +7,7 @@ models:
 datasets:
   california_housing:
     n_features:
-      min: 1
+      min: 2
       max: 5
       step: 1
     n_samples: [1000]

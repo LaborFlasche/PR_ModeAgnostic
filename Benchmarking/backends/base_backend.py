@@ -8,6 +8,7 @@ class BaseBackend(ABC):
     name: str
     library: str
     computation_type: Literal["true_value", "approximation"]
+    chosen_method: str | None = None
 
     def __init__(self, model, background: pd.DataFrame):
         self.model = model
