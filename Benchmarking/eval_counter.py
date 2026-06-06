@@ -10,7 +10,7 @@ the model in ``CountingModel`` before handing it to a backend and read
 
 from __future__ import annotations
 
-_COUNTED_METHODS = ("predict", "predict_proba")
+_COUNTED_METHODS = ("predict", "predict_proba", "decision_function")
 
 
 class CountingModel:

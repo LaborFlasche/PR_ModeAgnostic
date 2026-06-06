@@ -10,7 +10,7 @@ benchmark:
   # Approximation sweep: only the selected (library × approximator × budget)
   # combinations are run. Budget units differ across libraries — the recorded
   # n_model_evals is the comparable axis.
-  libraries: [shap, shapiq, lightshap]
+  libraries: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
   budgets: [64]
 
