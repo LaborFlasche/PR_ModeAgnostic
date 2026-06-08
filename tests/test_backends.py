@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestRegressor
+from Benchmarking.backends.gputreeshap_backend import GpuTreeShap
 from Benchmarking.backends.shap_backend import ShapTrueValueBackend
 
 
@@ -35,6 +36,24 @@ def test_shap_true_value_metadata():
     assert ShapTrueValueBackend.library == "shap"
     assert ShapTrueValueBackend.computation_type == "true_value"
     assert ShapTrueValueBackend.name == "shap_true_value"
+
+
+def test_gputreeshap_shape_and_columns(toy_rf):
+    shap = pytest.importorskip("shap")
+    if not hasattr(shap, "explainers") or not hasattr(shap.explainers, "GPUTree"):
+        pytest.skip("shap.explainers.GPUTree is not available")
+
+    model, X = toy_rf
+    backend = GpuTreeShap(model, X.iloc[:10])
+    contrib = backend.run_explainer(X.iloc[10:15])
+    assert contrib.shape == (5, 3)
+    assert list(contrib.columns) == ["f0", "f1", "f2"]
+
+
+def test_gputreeshap_metadata():
+    assert GpuTreeShap.library == "shap"
+    assert GpuTreeShap.computation_type == "true_value"
+    assert GpuTreeShap.name == "gputreeshap"
 
 
 from Benchmarking.backends.shapiq_backend import ShapIQTrueValueBackend
