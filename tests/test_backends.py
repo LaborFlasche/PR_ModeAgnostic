@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestRegressor
 from Benchmarking.backends.shap_backend import ShapTrueValueBackend
+from Benchmarking.backends.shapiq_git_main_backend import ShapIQGitMainTrueValueBackend
 
 
 @pytest.fixture
@@ -35,6 +36,24 @@ def test_shap_true_value_metadata():
     assert ShapTrueValueBackend.library == "shap"
     assert ShapTrueValueBackend.computation_type == "true_value"
     assert ShapTrueValueBackend.name == "shap_true_value"
+
+
+def test_shapiq_git_main_shape_and_columns(toy_rf):
+    shapiq = pytest.importorskip("shapiq")
+    if not hasattr(shapiq, "TabularExplainer"):
+        pytest.skip("shapiq.TabularExplainer is not available")
+
+    model, X = toy_rf
+    backend = ShapIQGitMainTrueValueBackend(model, X.iloc[:10])
+    contrib = backend.run_explainer(X.iloc[10:15])
+    assert contrib.shape == (5, 3)
+    assert list(contrib.columns) == ["f0", "f1", "f2"]
+
+
+def test_shapiq_git_main_metadata():
+    assert ShapIQGitMainTrueValueBackend.library == "shapiq"
+    assert ShapIQGitMainTrueValueBackend.computation_type == "true_value"
+    assert ShapIQGitMainTrueValueBackend.name == "shapiq_git_main_true_value"
 
 
 from Benchmarking.backends.shapiq_backend import ShapIQTrueValueBackend
