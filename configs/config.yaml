@@ -1,3 +1,19 @@
+benchmark:
+  # Number of rows used as the imputer background / reference set (defines the
+  # marginal value function). Cost per explanation scales with this;
+  n_background: 50
+  # Number of instances actually explained and averaged per (model, dataset) cell.
+  # The main runtime lever. The averaged accuracy metrics stabilise after a few
+  # hundred points, so a small value keeps representativeness while cutting runtime
+  # drastically. Use null to explain every remaining row.
+  n_eval: 50
+  # Approximation sweep: only the selected (library × approximator × budget)
+  # combinations are run. Budget units differ across libraries — the recorded
+  # n_model_evals is the comparable axis.
+  libraries: [shap, shapiq, lightshap, dalex]
+  approximators: [kernel, permutation]
+  budgets: [64]
+
 models:
   random_forest:
     n_estimators: [5]
@@ -25,53 +41,25 @@ models:
     max_iter: [10]
     # max_iter: [100, 200]
 
+# Feature counts are log-spaced, not linear: approximation quality and cost bend
+# hardest in the low range (4 -> ~128) and flatten after, so dense low / sparse high
+# samples the informative part. Counts are realized as the top-N highest-variance
+# columns of each dataset (see Datasets/load_datasets.py). gisette is capped at 256:
+# with a fixed budget of 64, KernelSHAP becomes pure noise far beyond that (you cannot
+# estimate hundreds of Shapley values from 64 coalition samples), so wider cells would
+# cost most of the runtime while producing uncomparable results. Three datasets cover
+# the axes that matter — regression (ames), mixed-type classification (adult), and a
+# high-dimensional stress test (gisette) — without the redundant overlapping sweeps
+# that california (subset of ames) and covertype (overlaps adult) added.
 datasets:
-  california_housing:
-    n_features:
-      min: 1
-      max: 8
-      step: 1
-    n_samples:
-      min: 2000
-      max: 20000
-      step: 2000
+  ames_housing:        # regression, real-world features, up to 79 native
+    n_features: [4, 64]
+    n_samples: [1000]
 
-  ames_housing:
-    n_features:
-      min: 1
-      max: 79
-      step: 10
-    n_samples:
-      min: 200
-      max: 1400
-      step: 200
+  adult_census:        # classification, mixed categorical/numeric, 14 native
+    n_features: [4, 14]
+    n_samples: [1000]
 
-  covertype:
-    n_features:
-      min: 1
-      max: 54
-      step: 5
-    n_samples:
-      min: 10000
-      max: 50000
-      step: 10000
-
-  adult_census:
-    n_features:
-      min: 1
-      max: 14
-      step: 2
-    n_samples:
-      min: 5000
-      max: 45000
-      step: 5000
-
-  gisette:
-    n_features:
-      min: 1
-      max: 5000
-      step: 500
-    n_samples:
-      min: 1000
-      max: 7000
-      step: 1000
+  gisette:             # high-dimensional stress test, capped where budget stays usable
+    n_features: [4, 256]
+    n_samples: [1000]

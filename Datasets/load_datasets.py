@@ -139,7 +139,13 @@ def load_adult_census(n_samples: int | None = None, n_features: int | None = Non
     feature_cols = [c for c in df.columns if c != target_col]
 
     X = df[feature_cols].copy()
-    y = df[target_col].astype(float)
+    # Target is the binary income bracket ("<=50K" / ">50K", sometimes with a trailing
+    # period from the openml ARFF) — a string/categorical that cannot be cast to float
+    # directly. Map the high-income class to 1 so downstream predict_proba[:, 1] reads
+    # as P(>50K).
+    y = (
+        df[target_col].astype(str).str.strip().str.replace(".", "", regex=False) == ">50K"
+    ).astype(int)
 
     # Impute and encode
     for col in X.columns:
@@ -169,9 +175,23 @@ def load_gisette(n_samples: int | None = None, n_features: int | None = None) ->
     Labels are -1 and 1. Good test case for feature selection and regularization.
     OpenML id: 41026 (train + validation split, 7k of 13.5k total rows).
     """
-    bunch = fetch_openml(data_id=41026, as_frame=True, parser="auto")  
-    X: pd.DataFrame = bunch.frame[bunch.feature_names]
-    y: pd.Series = bunch.frame[bunch.target_names[0]].astype(int)
+    # Gisette is stored as a sparse ARFF on openml, which cannot be returned as a
+    # DataFrame (as_frame=True raises "Sparse ARFF datasets cannot be loaded with
+    # as_frame=True"). Fetch raw arrays instead and densify — the data is only nominally
+    # sparse (pixel-derived features) and the downstream pipeline (variance selection,
+    # sklearn models, shap) expects a dense DataFrame.
+    import scipy.sparse as sp
+
+    bunch = fetch_openml(data_id=41026, as_frame=False, parser="auto")
+    data = bunch.data
+    data = data.toarray() if sp.issparse(data) else np.asarray(data)
+    feature_names = (
+        list(bunch.feature_names)
+        if getattr(bunch, "feature_names", None) is not None
+        else [f"f{i}" for i in range(data.shape[1])]
+    )
+    X = pd.DataFrame(data, columns=feature_names)
+    y = pd.Series(np.asarray(bunch.target)).astype(int)
 
     if n_features is not None:
         X = _select_features_by_variance(X, n_features)

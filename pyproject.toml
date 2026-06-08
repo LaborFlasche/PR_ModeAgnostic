@@ -13,8 +13,13 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "captum>=0.9.0",
+    "dalex>=1.8.0",
+    "ipykernel>=7.2.0",
+    "ipywidgets>=8.1.8",
     "lightshap>=0.1.12",
-    "pandas>=3.0.3",
+    # dalex pins pandas<3; the rest of the stack (shap/shapiq/lightshap) works on 2.x,
+    # so the floor is relaxed from 3.0.3 to keep dalex installable.
+    "pandas>=2.3.3,<3",
     "pyyaml>=6.0.3",
     "scikit-learn>=1.8.0",
     "shap>=0.51.0",
