@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=shap_merge
+#SBATCH --partition=Krater
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
 #SBATCH --time=00:05:00
 #SBATCH --output=slurm/logs/merge_%j.out
 #SBATCH --error=slurm/logs/merge_%j.err

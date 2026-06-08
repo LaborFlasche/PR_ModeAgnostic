@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=shap_bench
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --partition=Krater
+#SBATCH --cpus-per-task=2
 #SBATCH --time=00:45:00
 #SBATCH --output=slurm/logs/bench_%A_%a.out
 #SBATCH --error=slurm/logs/bench_%A_%a.err

@@ -53,9 +53,8 @@ cd ~/PR_ModeAgnostic
 
 # Install uv (downloads to ~/.local/bin/uv — no sudo needed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-source ~/.bashrc          # makes uv available in PATH
 
-# uv manages Python itself (Ubuntu 24.04 ships 3.12; we need >=3.13)
+# uv manages Python itself — Ubuntu 24.04 ships 3.12 but the project needs >=3.13
 uv python install 3.13
 
 # Install all dependencies from uv.lock into .venv/
