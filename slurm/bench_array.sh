@@ -2,7 +2,7 @@
 #SBATCH --job-name=shap_bench
 #SBATCH --partition=Krater
 #SBATCH --cpus-per-task=2
-#SBATCH --time=00:45:00
+#SBATCH --time=12:00:00
 #SBATCH --output=slurm/logs/bench_%A_%a.out
 #SBATCH --error=slurm/logs/bench_%A_%a.err
 # --array is set dynamically by submit.sh — do not set it here
