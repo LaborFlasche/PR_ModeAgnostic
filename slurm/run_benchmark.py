@@ -107,7 +107,7 @@ def main():
         X=ds["X"],
         run_meta={"dataset": dk, "model": mk, **dp},
     )
-    print(f"[task {args.task_id}] done → {output_csv}")
+    print(f"[task {args.task_id}] done -> {output_csv}")
 
 
 if __name__ == "__main__":
