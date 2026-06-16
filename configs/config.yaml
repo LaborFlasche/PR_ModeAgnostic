@@ -19,6 +19,14 @@ benchmark:
   libraries: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
   budgets: [512]
+  # Imputation scheme = the value function every library explains. "marginal" imputes
+  # masked features from the background distribution independently of the present ones.
+  # Threaded into every backend (shapiq imputer="marginal", shap Independent masker /
+  # KernelExplainer background, lightshap bg_X, dalex background sampling, shapr
+  # approach="independence"), so all libraries are compared on the *same* value function
+  # and it is controlled from this one field. "marginal" is currently the only supported
+  # value; a backend raises if asked for anything it cannot honor.
+  imputer: marginal
 
 models:
   random_forest:

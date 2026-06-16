@@ -46,6 +46,13 @@ class DalexApproxBackend(BaseBackend):
                 f"dalex supports only {self.SUPPORTED_APPROXIMATORS} (got '{approximator}'): "
                 "it has a single ordering-sampling SHAP method, with no kernel variant."
             )
+        imputer = self.config.get("imputer", "marginal")
+        if imputer != "marginal":
+            raise ValueError(
+                f"dalex backend only supports imputer='marginal' (got {imputer!r}): "
+                "predict_parts(type='shap') imputes removed features from the background "
+                "distribution (the marginal value function)."
+            )
         columns = list(x.columns)
         n_features = x.shape[1]
         budget = self.config.get("budget")

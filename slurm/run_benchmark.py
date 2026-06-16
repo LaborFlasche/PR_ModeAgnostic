@@ -71,8 +71,10 @@ def main():
 
     # Single source of truth for randomness: the same seed drives data subsampling,
     # model training, and every stochastic approximator, so the whole cell is
-    # reproducible end to end.
-    seed = bench.get("seed", 42)
+    # reproducible end to end. Required in the config (no hardcoded fallback).
+    seed = bench["seed"]
+    # Shared value function every library explains (no hardcoded fallback).
+    imputer = bench["imputer"]
 
     approx_specs = [
         (APPROX_MAP[lib], {"approximator": appr, "budget": bgt})
@@ -92,6 +94,7 @@ def main():
         n_background=bench["n_background"],
         n_eval=bench["n_eval"],
         seed=seed,
+        imputer=imputer,
     )
 
     dataset_enum = Dataset[dk.upper()]
