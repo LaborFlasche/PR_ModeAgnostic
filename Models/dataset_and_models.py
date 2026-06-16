@@ -34,17 +34,18 @@ class Dataset(Enum):
     ADULT_CENSUS = "adult_census"
     GISETTE = "gisette"
 
-    def load_dataset(self, n_samples: int | None = None, n_features: int | None = None) -> dict:
+    def load_dataset(self, n_samples: int | None = None, n_features: int | None = None,
+                     *, seed: int) -> dict:
         if self == Dataset.CALIFORNIA_HOUSING:
-            return load_california_housing(n_samples=n_samples, n_features=n_features)
+            return load_california_housing(n_samples=n_samples, n_features=n_features, seed=seed)
         elif self == Dataset.AMES_HOUSING:
-            return load_ames_housing(n_samples=n_samples, n_features=n_features)
+            return load_ames_housing(n_samples=n_samples, n_features=n_features, seed=seed)
         elif self == Dataset.COVERTYPE:
-            return load_covertype(n_samples=n_samples, n_features=n_features)
+            return load_covertype(n_samples=n_samples, n_features=n_features, seed=seed)
         elif self == Dataset.ADULT_CENSUS:
-            return load_adult_census(n_samples=n_samples, n_features=n_features)
+            return load_adult_census(n_samples=n_samples, n_features=n_features, seed=seed)
         elif self == Dataset.GISETTE:
-            return load_gisette(n_samples=n_samples, n_features=n_features)
+            return load_gisette(n_samples=n_samples, n_features=n_features, seed=seed)
         else:
             raise ValueError(f"Unknown dataset: {self.value}")
 
@@ -97,9 +98,11 @@ class Model(Enum):
         else:
             raise ValueError(f"Unknown model: {self.value}")
 
-    def get_model_with_params(self, dataset: Dataset, params: dict):
+    def get_model_with_params(self, dataset: Dataset, params: dict, seed: int):
         is_reg = dataset.is_regression
-        base = {'random_state': 42}
+        # random_state for every estimator comes from the benchmark seed (config.yaml ->
+        # benchmark.seed); seed is required so it can never silently diverge from config.
+        base = {'random_state': seed}
 
         if self == Model.LINEAR_BASELINE:
             if is_reg:

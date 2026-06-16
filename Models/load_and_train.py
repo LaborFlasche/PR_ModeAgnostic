@@ -14,9 +14,9 @@ class TrainingConfig:
         self.dataset = dataset
         self.model = model
     
-    def train(self, verbose: bool = False):
-        """Load the dataset and train the model."""
-        data = self.dataset.load_dataset()
+    def train(self, seed: int, verbose: bool = False):
+        """Load the dataset and train the model. ``seed`` controls data subsampling."""
+        data = self.dataset.load_dataset(seed=seed)
         trainer = self.model.get_model()
         trainer.fit(data["X"], data["y"], task=data["task"])
         if verbose:

@@ -26,15 +26,16 @@ def _select_features_by_variance(X: pd.DataFrame, n_features: int) -> pd.DataFra
     return X.iloc[:, sorted(top_idx)]
 
 
-def _subsample(X: pd.DataFrame, y: pd.Series, n_samples: int) -> tuple[pd.DataFrame, pd.Series]:
-    """Random subsample without replacement, reproducible via random_state=42."""
+def _subsample(X: pd.DataFrame, y: pd.Series, n_samples: int, seed: int) -> tuple[pd.DataFrame, pd.Series]:
+    """Random subsample without replacement, reproducible via the benchmark seed."""
     if n_samples >= len(X):
         return X, y
-    idx = X.sample(n=n_samples, random_state=42).index
+    idx = X.sample(n=n_samples, random_state=seed).index
     return X.loc[idx].reset_index(drop=True), y.loc[idx].reset_index(drop=True)
 
 
-def load_california_housing(n_samples: int | None = None, n_features: int | None = None) -> dict:
+def load_california_housing(n_samples: int | None = None, n_features: int | None = None,
+                            *, seed: int) -> dict:
     """California Housing – 8 features, 20 640 samples, regression."""
     bunch = fetch_california_housing(as_frame=True)
     X = bunch.frame[bunch.feature_names]
@@ -42,7 +43,7 @@ def load_california_housing(n_samples: int | None = None, n_features: int | None
     if n_features is not None:
         X = _select_features_by_variance(X, n_features)
     if n_samples is not None:
-        X, y = _subsample(X, y, n_samples)
+        X, y = _subsample(X, y, n_samples, seed)
     return {
         "name": "California Housing",
         "task": "regression",
@@ -53,7 +54,8 @@ def load_california_housing(n_samples: int | None = None, n_features: int | None
     }
 
 
-def load_ames_housing(n_samples: int | None = None, n_features: int | None = None) -> dict:
+def load_ames_housing(n_samples: int | None = None, n_features: int | None = None,
+                      *, seed: int) -> dict:
     """Ames Housing – ~79 features, 1 460 samples, regression.
 
     Categorical columns are label-encoded so tree and linear models can consume
@@ -83,7 +85,7 @@ def load_ames_housing(n_samples: int | None = None, n_features: int | None = Non
     if n_features is not None:
         X = _select_features_by_variance(X, n_features)
     if n_samples is not None:
-        X, y = _subsample(X, y, n_samples)
+        X, y = _subsample(X, y, n_samples, seed)
     return {
         "name": "Ames Housing",
         "task": "regression",
@@ -94,7 +96,8 @@ def load_ames_housing(n_samples: int | None = None, n_features: int | None = Non
     }
 
 
-def load_covertype(n_samples: int | None = None, n_features: int | None = None) -> dict:
+def load_covertype(n_samples: int | None = None, n_features: int | None = None,
+                   *, seed: int) -> dict:
     """Forest Covertype – 54 features, 581 012 samples, classification (7 classes).
 
     For faster experimentation a stratified subset of 50 000 samples is returned
@@ -105,12 +108,12 @@ def load_covertype(n_samples: int | None = None, n_features: int | None = None) 
     y: pd.Series = bunch.frame["Cover_Type"].astype(int)
 
     if n_samples is not None:
-        X, y = _subsample(X, y, n_samples)
+        X, y = _subsample(X, y, n_samples, seed)
     else:
         # Default: stratified 50 k subsample so notebooks stay responsive
         sample_idx = (
             y.groupby(y)
-            .apply(lambda g: g.sample(frac=50_000 / len(y), random_state=42))
+            .apply(lambda g: g.sample(frac=50_000 / len(y), random_state=seed))
             .index.get_level_values(1)
         )
         X = X.loc[sample_idx].reset_index(drop=True)
@@ -128,7 +131,8 @@ def load_covertype(n_samples: int | None = None, n_features: int | None = None) 
         "target_name": "Cover_Type",
     }
 
-def load_adult_census(n_samples: int | None = None, n_features: int | None = None) -> dict:
+def load_adult_census(n_samples: int | None = None, n_features: int | None = None,
+                      *, seed: int) -> dict:
     bunch = fetch_openml(data_id=1590, as_frame=True, parser="auto")
     df: pd.DataFrame = bunch.frame.copy()
 
@@ -158,7 +162,7 @@ def load_adult_census(n_samples: int | None = None, n_features: int | None = Non
     if n_features is not None:
         X = _select_features_by_variance(X, n_features)
     if n_samples is not None:
-        X, y = _subsample(X, y, n_samples)
+        X, y = _subsample(X, y, n_samples, seed)
     return {
         "name": "Adult Census",
         "task": "classification",
@@ -168,7 +172,8 @@ def load_adult_census(n_samples: int | None = None, n_features: int | None = Non
         "target_name": target_col,
     }
 
-def load_gisette(n_samples: int | None = None, n_features: int | None = None) -> dict:
+def load_gisette(n_samples: int | None = None, n_features: int | None = None,
+                 *, seed: int) -> dict:
     """Gisette – 5000 features, 7000 samples, binary classification (digits 4 vs 9).
 
     High-dimensional dataset from the NIPS 2003 feature selection challenge.
@@ -196,7 +201,7 @@ def load_gisette(n_samples: int | None = None, n_features: int | None = None) ->
     if n_features is not None:
         X = _select_features_by_variance(X, n_features)
     if n_samples is not None:
-        X, y = _subsample(X, y, n_samples)
+        X, y = _subsample(X, y, n_samples, seed)
     return {
         "name": "Gisette",
         "task": "classification",
@@ -208,17 +213,17 @@ def load_gisette(n_samples: int | None = None, n_features: int | None = None) ->
 
 
 
-def load_all() -> dict[str, dict]:
+def load_all(*, seed: int) -> dict[str, dict]:
     """Load all three datasets keyed by short name."""
     return {
-        "california": load_california_housing(),
-        "ames": load_ames_housing(),
-        "covertype": load_covertype(),
-        "adult_census": load_adult_census(),
+        "california": load_california_housing(seed=seed),
+        "ames": load_ames_housing(seed=seed),
+        "covertype": load_covertype(seed=seed),
+        "adult_census": load_adult_census(seed=seed),
     }
 
 
 if __name__ == "__main__":
-    datasets = load_all()
+    datasets = load_all(seed=42)
     for name, data in datasets.items():
         print(f"{name}: {data['X'].shape[0]} samples, {data['X'].shape[1]} features")

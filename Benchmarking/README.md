@@ -69,6 +69,7 @@ One row per backend per run. Key columns:
 | `dataset`, `model`, `n_features`, `n_samples` | Sweep parameters from `run_meta` |
 | `backend`, `library`, `computation_type` | Backend identity |
 | `approximator`, `budget` | Approximation config (NaN for the exact oracle) |
+| `seed` | The single benchmark-wide RNG seed used for this run (NaN for the deterministic oracle) |
 | `n_eval` | Number of samples explained |
 | `runtime_s` | Wall-clock time for that backend |
 | `n_model_evals` | Actual rows scored by the model — the fair budget axis across libraries (NaN for the oracle) |
