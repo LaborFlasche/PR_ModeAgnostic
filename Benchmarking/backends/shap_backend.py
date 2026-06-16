@@ -48,6 +48,13 @@ class ShapApproxBackend(BaseBackend):
         approximator = self.config.get("approximator", "permutation")
         budget = self.config.get("budget")
         seed = self.config.get("seed")
+        imputer = self.config.get("imputer", "marginal")
+        if imputer != "marginal":
+            raise ValueError(
+                f"shap backend only supports imputer='marginal' (got {imputer!r}): both the "
+                "Independent masker and KernelExplainer integrate over the background = the "
+                "marginal value function; no conditional masker is wired."
+            )
         f = marginal_predict(self.model, x.columns)
         n_features = x.shape[1]
 

@@ -68,17 +68,18 @@ class ShapIQApproxBackend(BaseBackend):
         approximator = self.config.get("approximator", "kernel")
         budget = self.config.get("budget", 256)
         seed = self.config.get("seed")
+        imputer = self.config.get("imputer", "marginal")
         if approximator not in self._APPROXIMATORS:
             raise ValueError(f"Unknown shapiq approximator '{approximator}' (use 'kernel' or 'permutation')")
 
         f = marginal_predict(self.model, columns)
         # random_state seeds both the approximator's coalition sampling and the
-        # marginal imputer's background draws, for reproducibility.
+        # imputer's background draws, for reproducibility.
         appr = self._APPROXIMATORS[approximator](n=n_features, random_state=seed)
         explainer = shapiq.TabularExplainer(
             model=f,
             data=self.background.values.astype(float),
-            imputer="marginal",  # shared marginal value function across all libraries
+            imputer=imputer,  # shared value function across all libraries (config-driven)
             approximator=appr,
             index="SV",
             max_order=1,
