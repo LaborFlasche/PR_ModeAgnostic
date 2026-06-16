@@ -83,11 +83,19 @@ class TrainedModel:
         return self._dataset_enum
 
 
+def load_seed(config_path: str, default: int = 42) -> int:
+    """The single benchmark-wide RNG seed (config.yaml -> benchmark.seed)."""
+    with open(config_path) as f:
+        raw = yaml.safe_load(f)
+    return (raw.get('benchmark', {}) or {}).get('seed', default)
+
+
 def generate_trained_models(config_path: str, datasets=None) -> list:
     if datasets is None:
         datasets = list(Dataset)
 
     config = load_config(config_path)
+    seed = load_seed(config_path)
     result = []
 
     for model_key, param_grid in config.items():
@@ -100,8 +108,8 @@ def generate_trained_models(config_path: str, datasets=None) -> list:
 
         for params in ParameterGrid(param_grid):
             for dataset in datasets:
-                data = dataset.load_dataset()
-                trainer = model_enum.get_model_with_params(dataset, params)
+                data = dataset.load_dataset(seed=seed)
+                trainer = model_enum.get_model_with_params(dataset, params, seed=seed)
                 trainer.fit(data['X'], data['y'], task=data['task'])
                 result.append(TrainedModel(
                     model_enum=model_enum,

@@ -49,6 +49,7 @@ class DalexApproxBackend(BaseBackend):
         columns = list(x.columns)
         n_features = x.shape[1]
         budget = self.config.get("budget")
+        seed = self.config.get("seed")
         B = max(1, round(budget / n_features)) if budget else 25
 
         f = marginal_predict(self.model, columns)
@@ -66,7 +67,10 @@ class DalexApproxBackend(BaseBackend):
         rows = []
         for i in range(len(x)):
             obs = x.iloc[i:i + 1]
-            pp = explainer.predict_parts(obs, type="shap", B=B)
+            # type="shap" averages contributions over B random orderings, imputing
+            # removed features from the background = the shared marginal value function.
+            # random_state makes those orderings reproducible across the benchmark.
+            pp = explainer.predict_parts(obs, type="shap", B=B, random_state=seed)
             agg = pp.result[pp.result["B"] == 0]
             contrib = agg.set_index("variable_name")["contribution"].reindex(columns)
             rows.append(contrib.to_numpy(dtype=float))

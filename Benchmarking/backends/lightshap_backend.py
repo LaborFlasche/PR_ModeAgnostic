@@ -28,6 +28,7 @@ class LightShapApproxBackend(BaseBackend):
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         approximator = self.config.get("approximator", "permutation")
         budget = self.config.get("budget")
+        seed = self.config.get("seed")
         if approximator not in ("kernel", "permutation"):
             raise ValueError(f"Unknown lightshap approximator '{approximator}' (use 'kernel' or 'permutation')")
 
@@ -39,9 +40,12 @@ class LightShapApproxBackend(BaseBackend):
         explanation = explain_any(
             f,
             x,
+            # bg_X is the background distribution lightshap imputes masked features from
+            # = the marginal value function shared with the other libraries.
             bg_X=self.background,
             method=approximator,
             how="sampling",
+            random_state=seed,  # reproducible coalition / permutation sampling
             verbose=False,
             **kwargs,
         )

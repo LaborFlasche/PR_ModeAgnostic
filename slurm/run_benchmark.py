@@ -69,6 +69,11 @@ def main():
     with open(args.config) as f:
         bench = yaml.safe_load(f)["benchmark"]
 
+    # Single source of truth for randomness: the same seed drives data subsampling,
+    # model training, and every stochastic approximator, so the whole cell is
+    # reproducible end to end.
+    seed = bench.get("seed", 42)
+
     approx_specs = [
         (APPROX_MAP[lib], {"approximator": appr, "budget": bgt})
         for lib in bench["libraries"]
@@ -86,11 +91,12 @@ def main():
         output_csv=output_csv,
         n_background=bench["n_background"],
         n_eval=bench["n_eval"],
+        seed=seed,
     )
 
     dataset_enum = Dataset[dk.upper()]
-    ds = dataset_enum.load_dataset(**dp)
-    trainer = Model[mk.upper()].get_model_with_params(dataset_enum, mp)
+    ds = dataset_enum.load_dataset(**dp, seed=seed)
+    trainer = Model[mk.upper()].get_model_with_params(dataset_enum, mp, seed=seed)
     trainer.fit(ds["X"], ds["y"], task=ds["task"])
 
     runner.run(

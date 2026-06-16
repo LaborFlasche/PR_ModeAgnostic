@@ -26,12 +26,17 @@ class BenchmarkRunner:
         output_csv: str,
         n_background: int = 100,
         n_eval: int | None = None,
+        seed: int | None = None,
     ):
         self.true_value_backends = true_value_backends
         self.approximation_specs = approximation_specs
         self.output_csv = output_csv
         self.n_background = n_background
         self.n_eval = n_eval
+        # Single source of truth for randomness (configs/config.yaml -> benchmark.seed).
+        # Injected into every approximation backend's config so all libraries seed their
+        # samplers identically and the whole benchmark is reproducible.
+        self.seed = seed
 
     def run(self, model, X: pd.DataFrame, run_meta: dict) -> None:
         if len(X) <= self.n_background:
@@ -78,8 +83,11 @@ class BenchmarkRunner:
         # --- approximation specs, each measured against the oracle ---
         for cls, config in self.approximation_specs:
             counter = CountingModel(model)
+            # Inject the benchmark-wide seed so every approximator seeds its sampler
+            # from the same value (without mutating the caller's spec dict).
+            run_config = {**config, "seed": self.seed}
             t0 = time.perf_counter()
-            contrib = cls(counter, background, config).run_explainer(X_eval)
+            contrib = cls(counter, background, run_config).run_explainer(X_eval)
             runtime = time.perf_counter() - t0
             rows.append(self._row(
                 run_meta, cls,
@@ -106,6 +114,7 @@ class BenchmarkRunner:
             "computation_type": cls.computation_type,
             "approximator": approximator if approximator is not None else float("nan"),
             "budget": budget if budget is not None else float("nan"),
+            "seed": self.seed if self.seed is not None else float("nan"),
             "n_eval": len(contrib),
             "runtime_s": round(runtime, 4),
             "n_model_evals": n_model_evals if n_model_evals is not None else float("nan"),
