@@ -86,6 +86,12 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_csv = os.path.join(args.output_dir, f"results_{args.task_id:04d}.csv")
+    # Each SLURM task owns exactly one file. The runner appends (so a header is only
+    # written when the file is absent); a stale file from a previous run — possibly with
+    # a different column schema — would get new rows appended under its old header and
+    # corrupt the file. Remove it so every task always writes a fresh, self-consistent CSV.
+    if os.path.exists(output_csv):
+        os.remove(output_csv)
 
     runner = BenchmarkRunner(
         true_value_backends=[ShapTrueValueBackend],
