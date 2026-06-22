@@ -68,35 +68,6 @@ class Model(Enum):
     # 3) Neuronale Netzwerke (PyTorch)
     PYTORCH_NEURAL_NETWORK = "pytorch_neural_network"
     
-    def get_model(self, dataset: Dataset):        
-        is_reg = dataset.is_regression
-        
-        if self == Model.LINEAR_BASELINE:
-            model = LinearRegression() if is_reg else LogisticRegression(max_iter=1000, random_state=42)
-            return SklearnTrainer(model)
-            
-        elif self == Model.LINEAR_REGULARIZED:
-            model = Ridge(random_state=42) if is_reg else LogisticRegression(C=0.1, max_iter=1000, random_state=42)
-            return SklearnTrainer(model)
-            
-        elif self == Model.DECISION_TREE:
-            model = DecisionTreeRegressor(random_state=42) if is_reg else DecisionTreeClassifier(random_state=42)
-            return SklearnTrainer(model)
-            
-        elif self == Model.RANDOM_FOREST:
-            model = RandomForestRegressor(random_state=42) if is_reg else RandomForestClassifier(random_state=42)
-            return SklearnTrainer(model)
-            
-        elif self == Model.GRADIENT_BOOSTING:
-            model = HistGradientBoostingRegressor(random_state=42) if is_reg else HistGradientBoostingClassifier(random_state=42)
-            return SklearnTrainer(model)
-            
-        elif self == Model.PYTORCH_NEURAL_NETWORK:
-            return PytorchTrainer()
-            
-        else:
-            raise ValueError(f"Unknown model: {self.value}")
-
     def get_model_with_params(self, dataset: Dataset, params: dict):
         is_reg = dataset.is_regression
         base = {'random_state': 42}
@@ -143,6 +114,11 @@ class Model(Enum):
             else:
                 model = HistGradientBoostingClassifier(**{**base, **params})
             return SklearnTrainer(model)
+
+        elif self == Model.PYTORCH_NEURAL_NETWORK:
+            hidden_dims = params.get("hidden_dims", [64])
+            epochs = params.get("epochs", 20)
+            return PytorchTrainer(hidden_dims=hidden_dims, epochs=epochs)
 
         else:
             raise ValueError(f"Model {self.value} does not support hyperparameter config")

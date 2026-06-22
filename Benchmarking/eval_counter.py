@@ -10,6 +10,13 @@ the model in ``CountingModel`` before handing it to a backend and read
 
 from __future__ import annotations
 
+try:
+    import torch
+    import torch.nn as nn
+    _TORCH_AVAILABLE = True
+except ImportError:
+    _TORCH_AVAILABLE = False
+
 _COUNTED_METHODS = ("predict", "predict_proba", "decision_function")
 
 
@@ -48,3 +55,31 @@ class CountingModel:
         if item in _COUNTED_METHODS and callable(attr):
             return self._wrap(attr)
         return attr
+
+
+if _TORCH_AVAILABLE:
+    class TorchCountingModel(nn.Module):
+        """``nn.Module`` wrapper around a PyTorch model that counts forward passes.
+
+        Unlike ``CountingModel`` (which proxies sklearn-style methods), this extends
+        ``torch.nn.Module`` so that:
+        - ``isinstance(counter, nn.Module)`` is True → gradient-based Captum methods
+          (GradientShap, DeepLiftShap) can backpropagate through it.
+        - ``.eval()`` / ``.train()`` propagate to the inner model (registered submodule).
+        - Every forward call increments ``n_rows`` by the batch size.
+        """
+
+        def __init__(self, model: "nn.Module"):
+            super().__init__()
+            self._inner = model  # registered as submodule automatically by nn.Module
+            self.n_calls: int = 0
+            self.n_rows: int = 0
+
+        def forward(self, x: "torch.Tensor") -> "torch.Tensor":
+            self.n_calls += 1
+            self.n_rows += x.shape[0]
+            return self._inner(x)
+
+        def reset(self) -> None:
+            self.n_calls = 0
+            self.n_rows = 0

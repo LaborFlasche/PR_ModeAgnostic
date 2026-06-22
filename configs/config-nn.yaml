@@ -1,0 +1,38 @@
+benchmark:
+  n_background: 50
+  n_eval: 50
+  # Captum implements different methods for Shapley values
+  # gradient_shap / deep_lift_shap require a torch.nn.Module (always true here).
+  # shapley_value_sampling / kernel_shap are model-agnostic but slower at high budgets.
+  captum_methods:
+    - shapley_value_sampling
+    - kernel_shap
+    - gradient_shap
+    - deep_lift_shap
+  # Sampling budgets swept for the non-deterministic methods.
+  # deep_lift_shap is deterministic and ignores this axis.
+  budgets: [50, 200]
+
+models:
+  pytorch_neural_network:
+    hidden_dims:
+      - [64]
+      - [128, 64]
+      - [256, 128, 64]
+    epochs: [20]
+
+# Same datasets as config.yaml but with smaller n_features ranges to keep
+# the NN benchmark tractable (gradient methods are cheaper than KernelSHAP
+# at high dimension, so gisette is still included at moderate width).
+datasets:
+  ames_housing:
+    n_features: [4, 16]
+    n_samples: [1000]
+
+  adult_census:
+    n_features: [4, 14]
+    n_samples: [1000]
+
+  gisette:
+    n_features: [4, 64]
+    n_samples: [1000]

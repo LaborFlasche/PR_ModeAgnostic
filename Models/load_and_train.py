@@ -17,7 +17,7 @@ class TrainingConfig:
     def train(self, verbose: bool = False):
         """Load the dataset and train the model."""
         data = self.dataset.load_dataset()
-        trainer = self.model.get_model()
+        trainer = self.model.get_model_with_params(self.dataset, {})
         trainer.fit(data["X"], data["y"], task=data["task"])
         if verbose:
             print(f"Trained {self.model.value} on {self.dataset.value}")
