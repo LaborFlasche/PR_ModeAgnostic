@@ -34,12 +34,9 @@ class BenchmarkRunner:
         self.output_csv = output_csv
         self.n_background = n_background
         self.n_eval = n_eval
-        # Single source of truth for randomness (configs/config.yaml -> benchmark.seed).
-        # Injected into every approximation backend's config so all libraries seed their
-        # samplers identically and the whole benchmark is reproducible.
         self.seed = seed
-        # Shared value function (configs/config.yaml -> benchmark.imputer). Injected into
-        # every approximation backend so all libraries explain the same value function.
+        # imputer defines how a feature is masked (replaced with values drawn from the background distribution=
+        # marginal = independently of the other present features
         self.imputer = imputer
 
     def run(self, model, X: pd.DataFrame, run_meta: dict) -> None:
@@ -87,9 +84,6 @@ class BenchmarkRunner:
         # --- approximation specs, each measured against the oracle ---
         for cls, config in self.approximation_specs:
             counter = CountingModel(model)
-            # Inject the benchmark-wide seed and imputer so every approximator seeds its
-            # sampler and picks its value function from the same values (without mutating
-            # the caller's spec dict).
             run_config = {**config, "seed": self.seed, "imputer": self.imputer}
             t0 = time.perf_counter()
             contrib = cls(counter, background, run_config).run_explainer(X_eval)

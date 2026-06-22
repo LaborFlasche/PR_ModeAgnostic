@@ -73,8 +73,6 @@ class ShapIQApproxBackend(BaseBackend):
             raise ValueError(f"Unknown shapiq approximator '{approximator}' (use 'kernel' or 'permutation')")
 
         f = marginal_predict(self.model, columns)
-        # random_state seeds both the approximator's coalition sampling and the
-        # imputer's background draws, for reproducibility.
         appr = self._APPROXIMATORS[approximator](n=n_features, random_state=seed)
         explainer = shapiq.TabularExplainer(
             model=f,

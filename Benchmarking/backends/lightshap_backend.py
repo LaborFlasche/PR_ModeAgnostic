@@ -46,12 +46,10 @@ class LightShapApproxBackend(BaseBackend):
         explanation = explain_any(
             f,
             x,
-            # bg_X is the background distribution lightshap imputes masked features from
-            # = the marginal value function shared with the other libraries.
             bg_X=self.background,
             method=approximator,
             how="sampling",
-            random_state=seed,  # reproducible coalition / permutation sampling
+            random_state=seed,
             verbose=False,
             **kwargs,
         )
