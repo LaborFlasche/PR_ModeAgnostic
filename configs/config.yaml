@@ -27,6 +27,28 @@ benchmark:
   # and it is controlled from this one field. "marginal" is currently the only supported
   # value; a backend raises if asked for anything it cannot honor.
   imputer: marginal
+  # Tree-specific true-value backends, only run for tree models (random_forest,
+  # decision_tree, gradient_boosting, xgboost, lightgbm — see Model.is_tree). Each
+  # is scored against the same shap oracle as everything else: path-dependent
+  # results will show systematic divergence from it (different value definition,
+  # not approximation error), interventional results are directly comparable.
+  # fasttreeshap runs out-of-process (scripts/setup_fasttreeshap_env.sh) and is
+  # skipped (NaN row) if that venv hasn't been provisioned. shapiq_tree only ever
+  # runs path-dependent here: its interventional mode crashes in this dependency
+  # stack (see ShapIQTreeInterventionalBackend's docstring) and is intentionally
+  # excluded from slurm/run_benchmark.py's TREE_TRUE_VALUE_MAP — the
+  # interventional row is silently absent for that one library, woodelf covers
+  # interventional instead.
+  tree_libraries: [shap_tree, shapiq_tree, woodelf, woodelf_gpu, fasttreeshap, gputreeshap]
+  tree_modes: [path_dependent, interventional]
+  # Pairwise (order-2) interactions: a separate sweep, only path-dependent (shap's
+  # interaction support requires it; the others follow suit for consistency — see
+  # each interaction backend's docstring). "shap_tree" is implicit/always-on (the
+  # order-2 oracle), so it isn't listed here — these are the additional libraries.
+  # interaction_max_features caps d**2 output columns from exploding (16 -> 256
+  # columns; raise with care, it's quadratic).
+  interaction_libraries: [shapiq_tree, woodelf, gputreeshap]
+  interaction_max_features: 16
 
 models:
   random_forest:
@@ -54,6 +76,16 @@ models:
     # learning_rate: [0.05, 0.1, 0.2]
     max_iter: [100]
     # max_iter: [100, 200]
+
+  xgboost:
+    n_estimators: [100]
+    max_depth: [6]
+    learning_rate: [0.1]
+
+  lightgbm:
+    n_estimators: [100]
+    max_depth: [-1]
+    learning_rate: [0.1]
 
 # Feature counts are log-spaced, not linear: approximation quality and cost bend
 # hardest in the low range (4 -> ~128) and flatten after, so dense low / sparse high

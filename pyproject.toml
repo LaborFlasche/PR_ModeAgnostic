@@ -16,6 +16,7 @@ dependencies = [
     "dalex>=1.8.0",
     "ipykernel>=7.2.0",
     "ipywidgets>=8.1.8",
+    "lightgbm>=4.6.0",
     "lightshap>=0.1.12",
     # dalex pins pandas<3; the rest of the stack (shap/shapiq/lightshap) works on 2.x,
     # so the floor is relaxed from 3.0.3 to keep dalex installable.
@@ -25,6 +26,8 @@ dependencies = [
     "shap>=0.51.0",
     "shapiq>=1.4.1",
     "torch>=2.12.0",
+    "woodelf-explainer>=0.4.3",
+    "xgboost>=2.0.0",
 ]
 
 [dependency-groups]

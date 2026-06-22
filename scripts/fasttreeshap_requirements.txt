@@ -1,0 +1,21 @@
+# Dedicated environment for fasttreeshap, which requires numpy<2 and is otherwise
+# incompatible with this project's main dependencies (numpy>=2, shap/shapiq/dalex).
+# numpy<2 in turn needs Python<=3.10 (numpy 1.26.4 is the last 1.x release with a
+# 3.10 wheel), which puts a hard ceiling below the main project's pins: xgboost
+# 3.3.0 needs Python>=3.12 and scikit-learn 1.8.0 needs Python>=3.11, so this venv
+# necessarily runs older minor versions of both than the main project. Re-pin to
+# the latest version each still supports under Python 3.10 if either changes.
+#
+# xgboost is pinned here only so this venv installs cleanly — it does NOT make
+# fasttreeshap work with XGBoost models. Confirmed live: fasttreeshap 0.1.6's
+# model loader cannot parse XGBoost 3.x's format at all (UnicodeDecodeError),
+# reproduced even training fresh with xgboost==3.2.0 inside this very venv, so
+# it isn't a cross-version pickling issue — FastTreeShapBackend skips XGBoost
+# models outright rather than attempting them. LightGBM and sklearn models work
+# (verified end-to-end with real, non-NaN output).
+numpy<2
+pandas
+fasttreeshap
+xgboost==3.2.0
+lightgbm==4.6.0
+scikit-learn==1.7.2
