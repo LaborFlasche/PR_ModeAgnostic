@@ -59,8 +59,7 @@ class ShapApproxBackend(BaseBackend):
         n_features = x.shape[1]
 
         if approximator == "kernel":
-            # KernelExplainer integrates over the full background set = the marginal
-            # imputer (the shared value function). It exposes no seed argument, so seed
+            # KernelExplainer exposes no seed argument, so seed
             # the global RNG it samples coalitions from for reproducibility.
             if seed is not None:
                 np.random.seed(seed)
@@ -68,9 +67,6 @@ class ShapApproxBackend(BaseBackend):
             nsamples = budget if budget is not None else "auto"
             values = np.asarray(explainer.shap_values(x, nsamples=nsamples, silent=True))
         elif approximator == "permutation":
-            # Independent masker over the full background = marginal imputer, matching
-            # the other libraries' value function. seed makes the sampled permutations
-            # reproducible.
             masker = shap.maskers.Independent(self.background, max_samples=len(self.background))
             explainer = shap.PermutationExplainer(f, masker, seed=seed, silent=True)
             # PermutationExplainer needs at least 2*n_features+1 evals per instance.

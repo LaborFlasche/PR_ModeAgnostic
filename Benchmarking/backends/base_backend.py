@@ -13,12 +13,6 @@ class BaseBackend(ABC):
     def __init__(self, model, background: pd.DataFrame, config: dict | None = None):
         self.model = model
         self.background = background
-        # Per-run knobs, e.g. {"approximator": "kernel", "budget": 512, "seed": 42}.
-        # The runner injects the single benchmark-wide "seed" (configs/config.yaml ->
-        # benchmark.seed) into this dict for every backend, so each stochastic
-        # approximator draws its coalitions/permutations from the same seed and runs
-        # are reproducible. Empty for the exact true-value backends, which are
-        # deterministic and take no tuning.
         self.config = config or {}
 
     @abstractmethod

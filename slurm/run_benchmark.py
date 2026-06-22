@@ -69,11 +69,7 @@ def main():
     with open(args.config) as f:
         bench = yaml.safe_load(f)["benchmark"]
 
-    # Single source of truth for randomness: the same seed drives data subsampling,
-    # model training, and every stochastic approximator, so the whole cell is
-    # reproducible end to end. Required in the config (no hardcoded fallback).
     seed = bench["seed"]
-    # Shared value function every library explains (no hardcoded fallback).
     imputer = bench["imputer"]
 
     approx_specs = [
@@ -86,10 +82,6 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_csv = os.path.join(args.output_dir, f"results_{args.task_id:04d}.csv")
-    # Each SLURM task owns exactly one file. The runner appends (so a header is only
-    # written when the file is absent); a stale file from a previous run — possibly with
-    # a different column schema — would get new rows appended under its old header and
-    # corrupt the file. Remove it so every task always writes a fresh, self-consistent CSV.
     if os.path.exists(output_csv):
         os.remove(output_csv)
 
