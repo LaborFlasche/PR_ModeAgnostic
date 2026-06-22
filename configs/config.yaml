@@ -1,0 +1,65 @@
+benchmark:
+  # Number of rows used as the imputer background / reference set (defines the
+  # marginal value function). Cost per explanation scales with this;
+  n_background: 200
+  # Number of instances actually explained and averaged per (model, dataset) cell.
+  # The main runtime lever. The averaged accuracy metrics stabilise after a few
+  # hundred points, so a small value keeps representativeness while cutting runtime
+  # drastically. Use null to explain every remaining row.
+  n_eval: 100
+  # Approximation sweep: only the selected (library × approximator × budget)
+  # combinations are run. Budget units differ across libraries — the recorded
+  # n_model_evals is the comparable axis.
+  libraries: [shap, shapiq, lightshap, dalex]
+  approximators: [kernel, permutation]
+  budgets: [512]
+
+models:
+  random_forest:
+    n_estimators: [100]
+    # n_estimators: {min: 50, max: 200, step: 50}
+    max_depth: [null]
+    # max_depth: [null, 10, 20]
+    min_samples_split: [2]
+    # min_samples_split: [2, 5]
+
+  decision_tree:
+    max_depth: [10]
+    # max_depth: [null, 5, 10, 20]
+    min_samples_split: [2]
+    # min_samples_split: [2, 5, 10]
+
+  linear_regularized:
+    alpha: [1.0]
+    # alpha: {min: 0.1, max: 1.0, num_steps: 4}
+    C: [1.0]
+    # C: {min: 0.1, max: 1.0, step: 0.3}
+
+  gradient_boosting:
+    learning_rate: [0.1]
+    # learning_rate: [0.05, 0.1, 0.2]
+    max_iter: [100]
+    # max_iter: [100, 200]
+
+# Feature counts are log-spaced, not linear: approximation quality and cost bend
+# hardest in the low range (4 -> ~128) and flatten after, so dense low / sparse high
+# samples the informative part. Counts are realized as the top-N highest-variance
+# columns of each dataset (see Datasets/load_datasets.py). gisette is capped at 256:
+# with a fixed budget of 64, KernelSHAP becomes pure noise far beyond that (you cannot
+# estimate hundreds of Shapley values from 64 coalition samples), so wider cells would
+# cost most of the runtime while producing uncomparable results. Three datasets cover
+# the axes that matter — regression (ames), mixed-type classification (adult), and a
+# high-dimensional stress test (gisette) — without the redundant overlapping sweeps
+# that california (subset of ames) and covertype (overlaps adult) added.
+datasets:
+  ames_housing:        # regression, real-world features, up to 79 native
+    n_features: [4, 16, 64]
+    n_samples: [1000]
+
+  adult_census:        # classification, mixed categorical/numeric, 14 native
+    n_features: [4, 7, 14]
+    n_samples: [1000]
+
+  gisette:             # high-dimensional stress test, capped where budget stays usable
+    n_features: [4, 32, 256]
+    n_samples: [1000]

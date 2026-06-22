@@ -128,65 +128,6 @@ def load_covertype(n_samples: int | None = None, n_features: int | None = None) 
         "target_name": "Cover_Type",
     }
 
-def load_adult_census(n_samples: int | None = None, n_features: int | None = None) -> dict:
-    bunch = fetch_openml(data_id=1590, as_frame=True, parser="auto")
-    df: pd.DataFrame = bunch.frame.copy()
-
-    # Drop the id column if present
-    df = df.drop(columns=["Id"], errors="ignore")
-
-    target_col = bunch.target_names[0]
-    feature_cols = [c for c in df.columns if c != target_col]
-
-    X = df[feature_cols].copy()
-    y = df[target_col].astype(float)
-
-    # Impute and encode
-    for col in X.columns:
-        if not pd.api.types.is_numeric_dtype(X[col]):
-            X[col] = X[col].fillna(X[col].mode().iloc[0])
-            X[col] = X[col].astype("category").cat.codes
-        else:
-            X[col] = X[col].fillna(X[col].median())
-
-    if n_features is not None:
-        X = _select_features_by_variance(X, n_features)
-    if n_samples is not None:
-        X, y = _subsample(X, y, n_samples)
-    return {
-        "name": "Adult Census",
-        "task": "classification",
-        "X": X,
-        "y": y,
-        "feature_names": list(X.columns),
-        "target_name": target_col,
-    }
-
-def load_gisette(n_samples: int | None = None, n_features: int | None = None) -> dict:
-    """Gisette – 5000 features, 7000 samples, binary classification (digits 4 vs 9).
-
-    High-dimensional dataset from the NIPS 2003 feature selection challenge.
-    Labels are -1 and 1. Good test case for feature selection and regularization.
-    OpenML id: 41026 (train + validation split, 7k of 13.5k total rows).
-    """
-    bunch = fetch_openml(data_id=41026, as_frame=True, parser="auto")  
-    X: pd.DataFrame = bunch.frame[bunch.feature_names]
-    y: pd.Series = bunch.frame[bunch.target_names[0]].astype(int)
-
-    if n_features is not None:
-        X = _select_features_by_variance(X, n_features)
-    if n_samples is not None:
-        X, y = _subsample(X, y, n_samples)
-    return {
-        "name": "Gisette",
-        "task": "classification",
-        "X": X,
-        "y": y,
-        "feature_names": list(X.columns),
-        "target_name": bunch.target_names[0],
-    }
-
-
 
 def load_all() -> dict[str, dict]:
     """Load all three datasets keyed by short name."""
