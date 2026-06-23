@@ -58,6 +58,20 @@ predict-counter so the real number of model evaluations is recorded.
 > appears only as an *approximation* backend. The polynomial oracle is validated once
 > against brute-force exact in the notebook's "Ground-truth validation" section.
 
+> **Reproducibility & control via the config.** Two `benchmark` fields in
+> `configs/config.yaml` are the single source of truth for the experiment, with no
+> hardcoded fallbacks downstream:
+> - `seed` — threaded into data subsampling, model training (every estimator's
+>   `random_state`), and every stochastic approximator, so changing it reseeds the whole
+>   experiment reproducibly.
+> - `imputer` — the shared value function. The runner injects it into every backend, which
+>   honors it (shapiq `imputer=`, shap `Independent` masker / `KernelExplainer` background,
+>   lightshap `bg_X`, dalex background sampling) or raises if it cannot. Combined with
+>   `marginal_predict` fixing the output space, this guarantees all libraries are compared
+>   on the *same* value function. `marginal` is currently the only supported value.
+>
+> Both are recorded in every CSV row for provenance.
+
 > **Note:** Results are appended to the CSV on every run. Delete `results.csv` before a clean sweep to avoid mixing old and new results.
 
 ### CSV output
@@ -69,6 +83,8 @@ One row per backend per run. Key columns:
 | `dataset`, `model`, `n_features`, `n_samples` | Sweep parameters from `run_meta` |
 | `backend`, `library`, `computation_type` | Backend identity |
 | `approximator`, `budget` | Approximation config (NaN for the exact oracle) |
+| `seed` | The single benchmark-wide RNG seed used for this run |
+| `imputer` | The shared value function every library explains (e.g. `marginal`) |
 | `n_eval` | Number of samples explained |
 | `runtime_s` | Wall-clock time for that backend |
 | `n_model_evals` | Actual rows scored by the model — the fair budget axis across libraries (NaN for the oracle) |

@@ -69,6 +69,9 @@ def main():
     with open(args.config) as f:
         bench = yaml.safe_load(f)["benchmark"]
 
+    seed = bench["seed"]
+    imputer = bench["imputer"]
+
     approx_specs = [
         (APPROX_MAP[lib], {"approximator": appr, "budget": bgt})
         for lib in bench["libraries"]
@@ -79,6 +82,8 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_csv = os.path.join(args.output_dir, f"results_{args.task_id:04d}.csv")
+    if os.path.exists(output_csv):
+        os.remove(output_csv)
 
     runner = BenchmarkRunner(
         true_value_backends=[ShapTrueValueBackend],
@@ -86,11 +91,13 @@ def main():
         output_csv=output_csv,
         n_background=bench["n_background"],
         n_eval=bench["n_eval"],
+        seed=seed,
+        imputer=imputer,
     )
 
     dataset_enum = Dataset[dk.upper()]
-    ds = dataset_enum.load_dataset(**dp)
-    trainer = Model[mk.upper()].get_model_with_params(dataset_enum, mp)
+    ds = dataset_enum.load_dataset(**dp, seed=seed)
+    trainer = Model[mk.upper()].get_model_with_params(dataset_enum, mp, seed=seed)
     trainer.fit(ds["X"], ds["y"], task=ds["task"])
 
     runner.run(
@@ -98,7 +105,7 @@ def main():
         X=ds["X"],
         run_meta={"dataset": dk, "model": mk, **dp},
     )
-    print(f"[task {args.task_id}] done → {output_csv}")
+    print(f"[task {args.task_id}] done -> {output_csv}")
 
 
 if __name__ == "__main__":

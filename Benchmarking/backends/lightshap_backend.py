@@ -28,8 +28,15 @@ class LightShapApproxBackend(BaseBackend):
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         approximator = self.config.get("approximator", "permutation")
         budget = self.config.get("budget")
+        seed = self.config.get("seed")
+        imputer = self.config.get("imputer", "marginal")
         if approximator not in ("kernel", "permutation"):
             raise ValueError(f"Unknown lightshap approximator '{approximator}' (use 'kernel' or 'permutation')")
+        if imputer != "marginal":
+            raise ValueError(
+                f"lightshap backend only supports imputer='marginal' (got {imputer!r}): "
+                "explain_any imputes masked features from bg_X (the marginal value function)."
+            )
 
         f = marginal_predict(self.model, x.columns)
         kwargs = {}
@@ -42,6 +49,7 @@ class LightShapApproxBackend(BaseBackend):
             bg_X=self.background,
             method=approximator,
             how="sampling",
+            random_state=seed,
             verbose=False,
             **kwargs,
         )

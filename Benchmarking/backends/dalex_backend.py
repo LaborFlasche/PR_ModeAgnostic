@@ -46,9 +46,17 @@ class DalexApproxBackend(BaseBackend):
                 f"dalex supports only {self.SUPPORTED_APPROXIMATORS} (got '{approximator}'): "
                 "it has a single ordering-sampling SHAP method, with no kernel variant."
             )
+        imputer = self.config.get("imputer", "marginal")
+        if imputer != "marginal":
+            raise ValueError(
+                f"dalex backend only supports imputer='marginal' (got {imputer!r}): "
+                "predict_parts(type='shap') imputes removed features from the background "
+                "distribution (the marginal value function)."
+            )
         columns = list(x.columns)
         n_features = x.shape[1]
         budget = self.config.get("budget")
+        seed = self.config.get("seed")
         B = max(1, round(budget / n_features)) if budget else 25
 
         f = marginal_predict(self.model, columns)
@@ -66,7 +74,7 @@ class DalexApproxBackend(BaseBackend):
         rows = []
         for i in range(len(x)):
             obs = x.iloc[i:i + 1]
-            pp = explainer.predict_parts(obs, type="shap", B=B)
+            pp = explainer.predict_parts(obs, type="shap", B=B, random_state=seed)
             agg = pp.result[pp.result["B"] == 0]
             contrib = agg.set_index("variable_name")["contribution"].reindex(columns)
             rows.append(contrib.to_numpy(dtype=float))

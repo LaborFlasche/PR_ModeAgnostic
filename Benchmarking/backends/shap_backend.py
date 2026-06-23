@@ -47,16 +47,28 @@ class ShapApproxBackend(BaseBackend):
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         approximator = self.config.get("approximator", "permutation")
         budget = self.config.get("budget")
+        seed = self.config.get("seed")
+        imputer = self.config.get("imputer", "marginal")
+        if imputer != "marginal":
+            raise ValueError(
+                f"shap backend only supports imputer='marginal' (got {imputer!r}): both the "
+                "Independent masker and KernelExplainer integrate over the background = the "
+                "marginal value function; no conditional masker is wired."
+            )
         f = marginal_predict(self.model, x.columns)
         n_features = x.shape[1]
 
         if approximator == "kernel":
+            # KernelExplainer exposes no seed argument, so seed
+            # the global RNG it samples coalitions from for reproducibility.
+            if seed is not None:
+                np.random.seed(seed)
             explainer = shap.KernelExplainer(f, self.background, silent=True)
             nsamples = budget if budget is not None else "auto"
             values = np.asarray(explainer.shap_values(x, nsamples=nsamples, silent=True))
         elif approximator == "permutation":
             masker = shap.maskers.Independent(self.background, max_samples=len(self.background))
-            explainer = shap.PermutationExplainer(f, masker, silent=True)
+            explainer = shap.PermutationExplainer(f, masker, seed=seed, silent=True)
             # PermutationExplainer needs at least 2*n_features+1 evals per instance.
             max_evals = max(budget, 2 * n_features + 1) if budget is not None else "auto"
             values = np.asarray(explainer(x, max_evals=max_evals, silent=True).values)

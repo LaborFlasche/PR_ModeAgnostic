@@ -13,8 +13,6 @@ class BaseBackend(ABC):
     def __init__(self, model, background: pd.DataFrame, config: dict | None = None):
         self.model = model
         self.background = background
-        # Per-run knobs (e.g. {"approximator": "kernel", "budget": 512}); empty
-        # for the exact true-value backends, which take no tuning.
         self.config = config or {}
 
     @abstractmethod

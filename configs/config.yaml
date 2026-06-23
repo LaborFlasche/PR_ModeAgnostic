@@ -1,4 +1,10 @@
 benchmark:
+  # Single source of truth for all randomness in the benchmark. The same seed is
+  # threaded into data subsampling, model training (every estimator's random_state),
+  # and every stochastic approximator (shap, shapiq, lightshap, dalex), so changing
+  # this one value reseeds the whole experiment reproducibly. Recorded per row in the
+  # results CSV. There are no hardcoded fallback seeds anywhere downstream.
+  seed: 42
   # Number of rows used as the imputer background / reference set (defines the
   # marginal value function). Cost per explanation scales with this;
   n_background: 200
@@ -13,6 +19,14 @@ benchmark:
   libraries: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
   budgets: [512]
+  # Imputation scheme = the value function every library explains. "marginal" imputes
+  # masked features from the background distribution independently of the present ones.
+  # Threaded into every backend (shapiq imputer="marginal", shap Independent masker /
+  # KernelExplainer background, lightshap bg_X, dalex background sampling, shapr
+  # approach="independence"), so all libraries are compared on the *same* value function
+  # and it is controlled from this one field. "marginal" is currently the only supported
+  # value; a backend raises if asked for anything it cannot honor.
+  imputer: marginal
 
 models:
   random_forest:

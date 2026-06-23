@@ -20,4 +20,4 @@ df = df.drop_duplicates(
 )
 
 df.to_csv(OUTPUT_CSV, index=False)
-print(f"Merged {len(files)} files → {len(df)} rows → {OUTPUT_CSV}")
+print(f"Merged {len(files)} files -> {len(df)} rows -> {OUTPUT_CSV}")

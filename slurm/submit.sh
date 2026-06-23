@@ -12,6 +12,12 @@ echo "Submitting $N array tasks..."
 
 mkdir -p slurm/logs
 
+# Start each sweep from a clean per-task output dir. These files are transient — they
+# are merged into Benchmarking/results.csv at the end. Clearing them prevents stale files
+# from a previous sweep (possibly a different task count or column schema) leaking into the merge.
+mkdir -p Benchmarking/slurm_results
+rm -f Benchmarking/slurm_results/results_*.csv
+
 ARRAY_JOB=$(sbatch \
     --array=0-$((N - 1)) \
     --chdir="$REPO_ROOT" \
