@@ -1,4 +1,13 @@
 benchmark:
+  # Single source of truth for all randomness (data subsampling, model training,
+  # and any stochastic approximator) — same meaning as configs/config.yaml's
+  # seed, required here too since slurm/run_benchmark.py reads it unconditionally.
+  seed: 42
+  # Shared value function (only "marginal" is supported) — see configs/config.yaml.
+  # Tree backends don't use this directly (they use their own
+  # path-dependent/interventional distinction via tree_modes below), but it's
+  # still required since run_benchmark.py reads it unconditionally for every config.
+  imputer: marginal
   # Reference background set for the imputer; cost scales with this.
   n_background: 200
   # Instances explained per (model, dataset) cell; null = explain every row.
