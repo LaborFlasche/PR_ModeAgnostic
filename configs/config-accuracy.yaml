@@ -7,18 +7,18 @@ benchmark:
   seed: 42
   # Number of rows used as the imputer background / reference set (defines the
   # marginal value function). Cost per explanation scales with this;
-  n_background: 200
+  n_background: [50, 200]
   # Number of instances actually explained and averaged per (model, dataset) cell.
   # The main runtime lever. The averaged accuracy metrics stabilise after a few
   # hundred points, so a small value keeps representativeness while cutting runtime
   # drastically. Use null to explain every remaining row.
-  n_eval: 100
+  n_eval: 10
   # Approximation sweep: only the selected (library × approximator × budget)
   # combinations are run. Budget units differ across libraries — the recorded
   # n_model_evals is the comparable axis.
   libraries: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
-  budgets: [512]
+  budgets: [64, 512]
   # Imputation scheme = the value function every library explains. "marginal" imputes
   # masked features from the background distribution independently of the present ones.
   # Threaded into every backend (shapiq imputer="marginal", shap Independent masker /
@@ -27,7 +27,6 @@ benchmark:
   # and it is controlled from this one field. "marginal" is currently the only supported
   # value; a backend raises if asked for anything it cannot honor.
   imputer: marginal
-  # Tree-specific backends and models live in configs/config-tree.yaml instead.
 
 models:
   random_forest:
@@ -68,13 +67,13 @@ models:
 # that california (subset of ames) and covertype (overlaps adult) added.
 datasets:
   ames_housing:        # regression, real-world features, up to 79 native
-    n_features: [4, 16, 64]
+    n_features: [12]
     n_samples: [1000]
 
   adult_census:        # classification, mixed categorical/numeric, 14 native
-    n_features: [4, 7, 14]
+    n_features: [8]
     n_samples: [1000]
 
   gisette:             # high-dimensional stress test, capped where budget stays usable
-    n_features: [4, 32, 256]
+    n_features: [16]
     n_samples: [1000]
