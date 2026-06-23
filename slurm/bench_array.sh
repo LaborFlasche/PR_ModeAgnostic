@@ -9,7 +9,11 @@
 # $1 = config path, $2 = output dir — both passed through by submit.sh so each
 # config (model-agnostic vs tree) writes to its own results directory.
 
-# Run from repo root (submit.sh does: sbatch --chdir=<repo_root> ...)
-CONFIG="${1:-configs/config.yaml}"
+# Run from repo root (submit.sh does: sbatch --chdir=<repo_root> ... slurm/bench_array.sh <config>)
+CONFIG="$1"
+if [ -z "$CONFIG" ]; then
+    echo "bench_array.sh: missing config argument" >&2
+    exit 1
+fi
 OUTPUT_DIR="${2:-Benchmarking/slurm_results}"
 ~/.local/bin/uv run python slurm/run_benchmark.py --task-id "$SLURM_ARRAY_TASK_ID" --config "$CONFIG" --output-dir "$OUTPUT_DIR"

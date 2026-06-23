@@ -88,7 +88,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
-    parser.add_argument("--config", default="configs/config.yaml")
+    parser.add_argument("--config", required=True,
+                        help="Path to the config file used to run the benchmark")
     parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
     args = parser.parse_args()
 
