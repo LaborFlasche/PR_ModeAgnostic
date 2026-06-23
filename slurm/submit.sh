@@ -1,16 +1,24 @@
 #!/bin/bash
-# Run this from the repo root:  bash slurm/submit.sh
+# Run this from the repo root:  bash slurm/submit.sh [config_path]
+# Defaults to configs/config.yaml (model-agnostic). Run again with
+# configs/config-tree.yaml for the tree-specific sweep — each config gets its
+# own output directory and merged CSV so the two runs don't collide.
 # It submits the array job and then a merge job that waits for it.
 
 set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Count (dataset × model) combinations from the config
-N=$(~/.local/bin/uv run python slurm/count_tasks.py)
-echo "Submitting $N array tasks..."
+CONFIG="${1:-configs/config.yaml}"
+CONFIG_NAME="$(basename "$CONFIG" .yaml)"
+OUTPUT_DIR="Benchmarking/slurm_results/$CONFIG_NAME"
+MERGED_CSV="Benchmarking/results_$CONFIG_NAME.csv"
 
-mkdir -p slurm/logs
+# Count (dataset × model) combinations from the config
+N=$(~/.local/bin/uv run python slurm/count_tasks.py "$CONFIG")
+echo "Submitting $N array tasks for config=$CONFIG..."
+
+mkdir -p slurm/logs "$OUTPUT_DIR"
 
 # Start each sweep from a clean per-task output dir. These files are transient — they
 # are merged into Benchmarking/results.csv at the end. Clearing them prevents stale files
@@ -21,18 +29,18 @@ rm -f Benchmarking/slurm_results/results_*.csv
 ARRAY_JOB=$(sbatch \
     --array=0-$((N - 1)) \
     --chdir="$REPO_ROOT" \
-    slurm/bench_array.sh \
+    slurm/bench_array.sh "$CONFIG" "$OUTPUT_DIR" \
     | awk '{print $4}')
 echo "Array job ID: $ARRAY_JOB"
 
 MERGE_JOB=$(sbatch \
     --dependency=afterok:"$ARRAY_JOB" \
     --chdir="$REPO_ROOT" \
-    slurm/merge.sh \
+    slurm/merge.sh --input-dir "$OUTPUT_DIR" --output-csv "$MERGED_CSV" \
     | awk '{print $4}')
 echo "Merge job ID: $MERGE_JOB (runs after all array tasks succeed)"
 
 echo ""
 echo "Monitor with:  squeue -u \$USER"
 echo "Logs in:       slurm/logs/"
-echo "Results in:    Benchmarking/slurm_results/  (merged → Benchmarking/results.csv)"
+echo "Results in:    $OUTPUT_DIR/  (merged → $MERGED_CSV)"

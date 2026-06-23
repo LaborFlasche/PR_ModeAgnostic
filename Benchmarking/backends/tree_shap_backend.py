@@ -5,14 +5,8 @@ from .base_backend import BaseBackend, reduce_multiclass, flatten_interactions
 
 
 class ShapTreePathDependentBackend(BaseBackend):
-    """Path-dependent TreeSHAP: exact Shapley values from the tree's own internal
-    sample-weighting, with no background/reference dataset.
-
-    This is a *different* value definition than the existing oracle
-    (``ShapTrueValueBackend``, which always passes a background and so gets
-    interventional TreeSHAP for tree models) — expect systematic, non-approximation-
-    error divergence against it for tree models, by design.
-    """
+    """Path-dependent TreeSHAP (no background) — a different value definition
+    than the interventional oracle, so expect systematic divergence by design."""
 
     name = "shap_tree_path_dependent"
     library = "shap"
@@ -30,16 +24,8 @@ class ShapTreePathDependentBackend(BaseBackend):
 
 class ShapInteractionBackend(BaseBackend):
     """Pairwise (order-2) path-dependent SHAP interactions — the order-2 oracle.
-
-    Unlike the order-1 oracle (``ShapTrueValueBackend``, interventional since it
-    always gets a background), this one must be path-dependent: shap's
-    interventional/independent feature-perturbation mode raises
-    ``FEATURE_DEPENDENCE::independent does not support interactions!`` (confirmed
-    live) — interaction values are only supported in path-dependent mode at all,
-    for shap. Every order-2 backend in this codebase is path-dependent for the
-    same reason, so this keeps the oracle consistent with what it's compared
-    against.
-    """
+    Must be path-dependent: shap's interventional mode raises
+    "FEATURE_DEPENDENCE::independent does not support interactions!"."""
 
     name = "shap_interaction"
     library = "shap"

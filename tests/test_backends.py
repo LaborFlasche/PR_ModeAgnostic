@@ -63,9 +63,7 @@ def test_shapiq_true_value_metadata():
 
 
 from Benchmarking.backends.tree_shap_backend import ShapTreePathDependentBackend
-# ShapIQTreeInterventionalBackend deliberately not exercised here: it crashes
-# unreliably depending on tree topology (see its docstring) and is excluded from
-# production wiring, so asserting it "passes" would be misleading.
+# ShapIQTreeInterventionalBackend not exercised here: it crashes unreliably (see its docstring).
 from Benchmarking.backends.tree_shapiq_backend import ShapIQTreePathDependentBackend
 from Benchmarking.backends.woodelf_backend import (
     WoodelfTreePathDependentBackend,
@@ -127,11 +125,8 @@ def test_model_is_tree():
     assert not Model.PYTORCH_NEURAL_NETWORK.is_tree
 
 
-# Deliberately not importing real xgboost here: doing so anywhere in this process
-# alongside shapiq's interventional TreeExplainer (exercised above) is a confirmed
-# bidirectional hang/segfault in this dependency combination, regardless of import
-# order (see ShapIQTreeInterventionalBackend's docstring in tree_shapiq_backend.py).
-# A duck-typed fake exercises marginal_predict's routing logic without that risk.
+# Duck-typed fake, not real xgboost: importing xgboost alongside shapiq's
+# interventional TreeExplainer (exercised above) segfaults in this dependency stack.
 class _FakeXGBClassifier:
     __module__ = "xgboost.sklearn"
 
@@ -184,20 +179,13 @@ def test_woodelf_interaction_skips_multiclass(toy_rf):
 
 
 # --- Axiom/correctness regression tests --------------------------------------
-#
-# Tolerances below are not guesses: each was set from values actually measured
-# live on this toy_rf fixture (see the Phase 2 investigation), not from
-# TreeSHAPBench's defaults, since the libraries' own conventions differ from
-# what that notebook assumed (see ShapIQInteractionBackend's docstring).
+# Tolerances are set from values measured live on this toy_rf fixture, not
+# guessed defaults.
 
 def test_woodelf_interventional_efficiency(toy_rf):
-    """sum(shap_values_row) + E[f(background)] ~= f(x) for an interventional
-    (marginal) explanation - the textbook efficiency axiom. Holds tightly for
-    interventional backends; path-dependent backends use a different value
-    definition (the tree's own internal sample weighting) and do NOT satisfy
-    this against a background mean, by design - see
-    test_path_dependent_backends_agree below for the check that applies to them.
-    """
+    """sum(shap_values_row) + E[f(background)] ~= f(x): the efficiency axiom.
+    Path-dependent backends use a different value definition and don't satisfy
+    this against a background mean — see test_path_dependent_backends_agree."""
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]
@@ -208,13 +196,9 @@ def test_woodelf_interventional_efficiency(toy_rf):
 
 
 def test_path_dependent_backends_agree(toy_rf):
-    """shap, shapiq, and woodelf's path-dependent TreeExplainers all compute the
-    *same* value (the tree's internal sample-weighting definition, no
-    background) - so unlike the interventional case, comparing them to each
-    other (rather than to a background-mean baseline) is the meaningful
-    correctness check. Measured live: shap vs shapiq agree to ~5.5e-17, shap vs
-    woodelf to ~2.3e-8 - both far inside the atol used here.
-    """
+    """shap, shapiq, and woodelf's path-dependent TreeExplainers compute the
+    same value (no background), so they should agree with each other directly
+    rather than against a baseline."""
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]
@@ -230,19 +214,10 @@ def test_path_dependent_backends_agree(toy_rf):
     (WoodelfInteractionBackend, 1e-4),
 ])
 def test_interaction_row_sum_matches_own_first_order(toy_rf, backend_cls, atol):
-    """sum_j interaction(i, j) == first-order Shapley value(i) - the interaction
-    axiom shap/woodelf both document (a "remaining main effect" folded onto the
-    diagonal). Measured live: holds to ~3e-16 for shap, ~6e-8 for woodelf.
-
-    shapiq is deliberately excluded here: its row-sum axiom only holds *within
-    a single explainer call* (its own SV is the order-1 byproduct of the same
-    max_order=2 call, by construction - see test_shapiq_interaction_self_consistent
-    below) - comparing against a *separately constructed*
-    ShapIQTreePathDependentBackend call shows a ~0.03-0.08 gap because shapiq's
-    max_order=1 SV path and its k-SII order-1 byproduct are not numerically
-    identical (confirmed live, not a defect in this integration - see
-    ShapIQInteractionBackend's docstring).
-    """
+    """sum_j interaction(i, j) == first-order Shapley value(i): the interaction
+    axiom shap/woodelf both fold onto the diagonal. shapiq is excluded here —
+    see test_shapiq_interaction_self_consistent and ShapIQInteractionBackend's
+    docstring for why it needs a different check."""
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]
@@ -259,12 +234,9 @@ def test_interaction_row_sum_matches_own_first_order(toy_rf, backend_cls, atol):
 
 
 def test_shapiq_interaction_self_consistent(toy_rf):
-    """Within ShapIQInteractionBackend's own single explainer call, the
-    diagonal is constructed *from* its own order-1 byproduct
-    (diag[i] = SV[i] - sum_{j!=i} interaction[i,j]), so the row-sum axiom holds
-    by construction here - this guards against a future refactor accidentally
-    breaking that construction, not against shapiq's own algorithm.
-    """
+    """The row-sum axiom holds by construction within a single explainer call
+    (the diagonal is built from that call's own order-1 byproduct) — guards
+    against a refactor breaking that construction."""
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]

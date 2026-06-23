@@ -12,10 +12,7 @@ from .base_backend import (
 
 
 def _woodelf_gpu_ok() -> tuple[bool, str]:
-    """(ok, skip_reason). woodelf's GPU=True path needs cupy *and* an actual CUDA
-    device — cupy import alone doesn't guarantee a device is visible, and a CUDA
-    device alone is useless without cupy installed, so both are checked.
-    """
+    """(ok, skip_reason). woodelf's GPU=True needs both cupy and a CUDA device."""
     if not cuda_available():
         return False, "no CUDA device"
     try:
@@ -26,15 +23,8 @@ def _woodelf_gpu_ok() -> tuple[bool, str]:
 
 
 class _WoodelfBackend(BaseBackend):
-    """Shared logic for woodelf's tree-specific explainer.
-
-    woodelf 0.4.3 does not support multiclass models (upstream TODO, per
-    TreeSHAPBench's own guard in benchmark_utils.py:run_woodelf) — detected via the
-    model's ``objective`` string rather than ``n_classes_``, which may not exist
-    pre-fit. On that condition, or any model-load failure, return an all-NaN frame
-    instead of raising so one incompatible (model, dataset) cell doesn't crash the
-    whole sweep.
-    """
+    """woodelf's tree-specific explainer. woodelf 0.4.3 doesn't support
+    multiclass models (upstream limitation) — skips with an all-NaN frame."""
 
     library = "woodelf"
     computation_type = "true_value"
@@ -75,10 +65,8 @@ class WoodelfTreeInterventionalBackend(_WoodelfBackend):
 
 
 class WoodelfGPUPathDependentBackend(_WoodelfBackend):
-    """Same as ``WoodelfTreePathDependentBackend`` but GPU=True (cupy-backed).
-    Skips (NaN) when no CUDA device or cupy is unavailable — unverified on real
-    GPU hardware, since this machine has neither.
-    """
+    """GPU=True (cupy-backed) version of WoodelfTreePathDependentBackend.
+    Unverified on real GPU hardware."""
 
     name = "woodelf_gpu_path_dependent"
     interventional = False
@@ -86,8 +74,7 @@ class WoodelfGPUPathDependentBackend(_WoodelfBackend):
 
 
 class WoodelfGPUInterventionalBackend(_WoodelfBackend):
-    """Same as ``WoodelfTreeInterventionalBackend`` but GPU=True. Same caveats as
-    ``WoodelfGPUPathDependentBackend``."""
+    """GPU=True version of WoodelfTreeInterventionalBackend. Same caveat."""
 
     name = "woodelf_gpu_interventional"
     interventional = True

@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-# Provisions the dedicated venv that FastTreeShapBackend shells out to.
-#
-# fasttreeshap needs numpy<2, incompatible with this project's main numpy>=2 stack,
-# so it gets its own venv — and that venv must NOT live inside this repo if the repo
-# is synced via OneDrive/iCloud/etc: a prior attempt at the sibling TreeSHAP project
-# had its venv's `bin/python` (a symlink) silently mangled into a plain text file by
-# OneDrive sync, breaking the interpreter. Defaults to ~/.cache, outside any sync root.
+# Provisions the dedicated venv that FastTreeShapBackend shells out to
+# (fasttreeshap needs numpy<2, incompatible with this project's numpy>=2 stack).
+# Defaults to ~/.cache rather than inside the repo: OneDrive/iCloud sync can
+# silently mangle a venv's bin/python symlink into a plain text file.
 set -euo pipefail
 
 VENV_DIR="${FASTTREESHAP_VENV_DIR:-$HOME/.cache/pr-modeagnostic/.venv-fasttreeshap}"

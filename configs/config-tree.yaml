@@ -1,0 +1,47 @@
+benchmark:
+  # Reference background set for the imputer; cost scales with this.
+  n_background: 200
+  # Instances explained per (model, dataset) cell; null = explain every row.
+  n_eval: 100
+  # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
+  # ShapTrueValueBackend (the oracle) still always runs regardless.
+  libraries: []
+  approximators: []
+  budgets: []
+  # Tree-specific true-value backends, only run for tree models. No GPU
+  # libraries plugged in for now (woodelf_gpu/gputreeshap backends still exist
+  # in code for future use — see their docstrings). shapiq_tree only ever runs
+  # path-dependent: its interventional mode crashes (see
+  # ShapIQTreeInterventionalBackend's docstring); woodelf covers interventional.
+  tree_libraries: [shap_tree, shapiq_tree, woodelf, fasttreeshap]
+  tree_modes: [path_dependent, interventional]
+  # Pairwise (order-2) interactions, path-dependent only. "shap_tree" is
+  # implicit/always-on (the oracle). interaction_max_features caps d**2 output
+  # columns (quadratic — raise with care).
+  interaction_libraries: [shapiq_tree, woodelf]
+  interaction_max_features: 16
+
+models:
+  xgboost:
+    n_estimators: [100]
+    max_depth: [6]
+    learning_rate: [0.1]
+
+  lightgbm:
+    n_estimators: [100]
+    max_depth: [-1]
+    learning_rate: [0.1]
+
+# Same dataset grid as configs/config.yaml.
+datasets:
+  ames_housing:
+    n_features: [4, 16, 64]
+    n_samples: [1000]
+
+  adult_census:
+    n_features: [4, 7, 14]
+    n_samples: [1000]
+
+  gisette:
+    n_features: [4, 32, 256]
+    n_samples: [1000]

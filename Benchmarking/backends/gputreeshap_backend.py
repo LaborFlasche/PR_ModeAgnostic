@@ -11,23 +11,9 @@ from .base_backend import (
 
 
 class _GPUTreeShapBackend(BaseBackend):
-    """XGBoost's own native GPU SHAP path: ``Booster.predict(dmatrix,
-    pred_contribs=True / pred_interactions=True, ...)`` with ``device="cuda"``.
-
-    This is not a separate "gputreeshap" package — TreeSHAPBench's own
-    extras_and_scaling.ipynb (section E3) uses exactly this XGBoost-native path
-    under that name. XGBoost-only: the booster API this needs doesn't exist on
-    sklearn/LightGBM models. Gated on ``cuda_available()`` *before* attempting
-    anything, since xgboost's device="cuda" does not raise when no GPU is present
-    — it silently warns and falls back to CPU (confirmed live) — so a try/except
-    would wrongly report CPU timings as "GPU" results.
-
-    UNVERIFIED ON REAL GPU HARDWARE: this machine has no CUDA device, so the
-    actual prediction path (output shape, whether/how the trailing bias
-    column/row needs dropping) has not been exercised live — only the
-    model-type guard and the cuda_available() skip path are tested. Re-verify
-    end-to-end on a CUDA machine before trusting its numbers.
-    """
+    """XGBoost's own native GPU SHAP path (Booster.predict with device="cuda"),
+    not a separate package. XGBoost-only. UNVERIFIED ON REAL GPU HARDWARE —
+    only the guard/skip path is tested; re-verify before trusting its numbers."""
 
     library = "gputreeshap"
     computation_type = "true_value"
@@ -49,9 +35,7 @@ class GPUTreeShapBackend(_GPUTreeShapBackend):
             print(f"  [SKIP] {self.name}: {skip}")
             return nan_result(x)
 
-        import xgboost as xgb  # lazy: only reached once the model is already an
-        # xgboost object and a CUDA device is confirmed present — see the module
-        # docstring on why xgboost must never be imported at module level here.
+        import xgboost as xgb  # lazy: avoid importing xgboost at module level
         booster = self.model.get_booster()
         booster.set_param({"device": "cuda"})
         contribs = booster.predict(xgb.DMatrix(x), pred_contribs=True)

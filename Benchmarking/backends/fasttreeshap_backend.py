@@ -14,18 +14,11 @@ _DEFAULT_VENV_PYTHON = str(Path.home() / ".cache" / "pr-modeagnostic" / ".venv-f
 
 
 class FastTreeShapBackend(BaseBackend):
-    """fasttreeshap's TreeExplainer, path-dependent only.
-
-    fasttreeshap requires numpy<2 (this project requires numpy>=2), so it runs
-    out-of-process in a dedicated venv (see scripts/setup_fasttreeshap_env.sh —
-    provisioned and verified end-to-end: real, non-NaN output confirmed for
-    RandomForest and LightGBM models), invoked here via subprocess — never
-    imported directly into this process. XGBoost models are skipped explicitly
-    (see the model-type check below) rather than attempted: confirmed it cannot
-    work at all, not just a version-pinning issue. Any other failure (missing
-    venv, import error, an unexpected model-load incompatibility) logs a skip and
-    returns an all-NaN frame rather than crashing the sweep.
-    """
+    """fasttreeshap's TreeExplainer, path-dependent only. Requires numpy<2 (this
+    project requires numpy>=2), so it runs out-of-process via subprocess in a
+    dedicated venv (see scripts/setup_fasttreeshap_env.sh), never imported
+    directly. XGBoost is skipped (see below); any other failure (missing venv,
+    model-load error) logs a skip and returns an all-NaN frame."""
 
     name = "fasttreeshap_path_dependent"
     library = "fasttreeshap"
@@ -33,17 +26,9 @@ class FastTreeShapBackend(BaseBackend):
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         if type(self.model).__module__.startswith("xgboost"):
-            # Confirmed (not a version-pinning fix): fasttreeshap 0.1.6's internal
-            # XGBTreeModelLoader cannot parse XGBoost 3.x's model representation at
-            # all — reproduced even training fresh inside the fasttreeshap venv
-            # itself (xgboost==3.2.0, the newest release that still supports the
-            # Python 3.10 this venv is pinned to): raises UnicodeDecodeError trying
-            # to read the raw model bytes. Matches TreeSHAPBench's own documented
-            # finding (their benchmark_utils.py notes a ValueError from the same
-            # loader against XGBoost 3.x). fasttreeshap was last released in 2022
-            # and isn't maintained to track XGBoost's format changes — this isn't
-            # fixable by re-pinning versions on our side. LightGBM and sklearn
-            # models are unaffected (verified) — only XGBoost is skipped here.
+            # fasttreeshap 0.1.6 (unmaintained since 2022) cannot parse XGBoost
+            # 3.x's model format at all (UnicodeDecodeError) — not fixable by
+            # version-pinning. LightGBM/sklearn models are unaffected.
             print(f"  [SKIP] {self.name}: fasttreeshap 0.1.6 cannot parse XGBoost "
                   "3.x's model format (confirmed upstream incompatibility)")
             return nan_result(x)

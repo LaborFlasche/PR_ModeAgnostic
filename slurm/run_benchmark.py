@@ -12,14 +12,9 @@ import os
 import sys
 import warnings
 
-# xgboost and lightgbm must be imported — and, if used, fitted — before shapiq is
-# imported anywhere in this process. Confirmed firsthand: whichever of
-# {xgboost, lightgbm} vs shapiq claims its native runtime first works fine
-# afterward; if shapiq is imported first, a later xgboost/lightgbm .fit() segfaults
-# outright (reproduced independent of any shapiq explainer ever actually running —
-# merely importing shapiq is enough). This import has no direct use below; it only
-# establishes the safe load order before `from Benchmarking.backends import (...)`
-# pulls in shapiq via shapiq_backend.py / tree_shapiq_backend.py.
+# xgboost/lightgbm must be imported before shapiq anywhere in this process, or a
+# later xgboost/lightgbm .fit() segfaults — establishes safe load order before
+# `from Benchmarking.backends import (...)` pulls in shapiq.
 import xgboost  # noqa: F401
 import lightgbm  # noqa: F401
 
@@ -45,13 +40,11 @@ from Benchmarking.backends import (
     ShapIQInteractionBackend,
     WoodelfTreePathDependentBackend,
     WoodelfTreeInterventionalBackend,
-    WoodelfGPUPathDependentBackend,
-    WoodelfGPUInterventionalBackend,
     WoodelfInteractionBackend,
     FastTreeShapBackend,
-    GPUTreeShapBackend,
-    GPUTreeShapInteractionBackend,
 )
+# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in Benchmarking.backends for
+# future use but aren't wired in here for now.
 
 APPROX_MAP = {
     "shap": ShapApproxBackend,
@@ -61,35 +54,21 @@ APPROX_MAP = {
 }
 
 # Tree-specific true-value backends, only applied to tree models (Model.is_tree).
-# Keyed by (library, mode); only libraries supporting a given mode have an entry.
-# Deliberately no ("shapiq_tree", "interventional") entry: shapiq's interventional
-# TreeExplainer crashes in this dependency stack (confirmed: hangs on actual
-# XGBoost/LightGBM models, segfaults on plain sklearn models depending on tree
-# topology) — see ShapIQTreeInterventionalBackend's docstring in
-# Benchmarking/backends/tree_shapiq_backend.py for the full diagnosis.
-# woodelf_gpu/gputreeshap always self-skip (NaN) without a CUDA device — see their
-# class docstrings — and are unverified on real GPU hardware.
+# Keyed by (library, mode). No ("shapiq_tree", "interventional") entry: it
+# crashes in this dependency stack — see tree_shapiq_backend.py.
 TREE_TRUE_VALUE_MAP = {
     ("shap_tree", "path_dependent"): ShapTreePathDependentBackend,
     ("shapiq_tree", "path_dependent"): ShapIQTreePathDependentBackend,
     ("woodelf", "path_dependent"): WoodelfTreePathDependentBackend,
     ("woodelf", "interventional"): WoodelfTreeInterventionalBackend,
-    ("woodelf_gpu", "path_dependent"): WoodelfGPUPathDependentBackend,
-    ("woodelf_gpu", "interventional"): WoodelfGPUInterventionalBackend,
     ("fasttreeshap", "path_dependent"): FastTreeShapBackend,
-    ("gputreeshap", "path_dependent"): GPUTreeShapBackend,
 }
 
-# Pairwise-interaction (order-2) backends, only path-dependent (shap's interaction
-# support requires it; the others follow suit for consistency — see each class's
-# docstring). Keyed by library name only. "shap_tree" is intentionally absent:
-# ShapInteractionBackend is hardcoded as the always-on order-2 oracle below, the
-# same way ShapTrueValueBackend is hardcoded for order-1 — adding a "shap_tree"
-# entry here too would instantiate it twice.
+# Pairwise-interaction (order-2) backends, path-dependent only. "shap_tree" is
+# absent: ShapInteractionBackend is hardcoded as the always-on oracle below.
 INTERACTION_TRUE_VALUE_MAP = {
     "shapiq_tree": ShapIQInteractionBackend,
     "woodelf": WoodelfInteractionBackend,
-    "gputreeshap": GPUTreeShapInteractionBackend,
 }
 
 
@@ -142,9 +121,7 @@ def main():
 
     model_enum = Model[mk.upper()]
 
-    # ShapTrueValueBackend must stay first: BenchmarkRunner._oracle_name() picks the
-    # first true_value backend whose library == "shap" as the oracle, and
-    # ShapTreePathDependentBackend below is also library "shap".
+    # ShapTrueValueBackend must stay first: it's picked as the oracle.
     true_value_backends = [ShapTrueValueBackend]
     if model_enum.is_tree:
         for lib in bench.get("tree_libraries", []):
