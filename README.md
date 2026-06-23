@@ -49,13 +49,14 @@ Model hyperparameters and dataset sweep ranges are defined in `config.yaml`. Use
 ```python
 from itertools import product
 from sklearn.model_selection import ParameterGrid
-from Models.config_parser import load_config, load_dataset_config
+from Models.config_parser import load_config, load_dataset_config, load_seed
 from Models.dataset_and_models import Dataset
 
 CONFIG = "config.yaml"
 
 model_config   = load_config(CONFIG)        # {model_key: {param: [values]}}
 dataset_config = load_dataset_config(CONFIG) # {dataset_key: {n_features: [...], n_samples: [...]}}
+seed = load_seed(CONFIG)                     # benchmark-wide RNG seed (not a hyperparameter)
 
 # All model × hyperparameter combinations
 model_runs = [
@@ -77,7 +78,7 @@ print(f"{len(model_runs)} model configs × {len(dataset_runs)} dataset configs =
 
 # Load a single dataset variant
 dataset_key, dataset_params = dataset_runs[0]
-ds = Dataset[dataset_key.upper()].load_dataset(**dataset_params)
+ds = Dataset[dataset_key.upper()].load_dataset(**dataset_params, seed=seed)
 X, y = ds["X"], ds["y"]
 ```
 
