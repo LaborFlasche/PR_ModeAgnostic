@@ -1,10 +1,10 @@
 benchmark:
   seed: 42
   imputer: marginal
-  n_background: 100
-  n_eval: 8
-  libraries: [shap, shapiq, lightshap, dalex]
-  approximators: [kernel, permutation]
+  n_background: 50
+  n_eval: 5
+  libraries: [shap, shapiq]
+  approximators: [permutation]
   budgets: [64]
 
 models:
@@ -13,20 +13,7 @@ models:
     max_depth: [3]
     min_samples_split: [2]
 
-  xgboost:
-    n_estimators: [5]
-    max_depth: [3]
-    learning_rate: [0.1]
-
-  lightgbm:
-    n_estimators: [5]
-    max_depth: [3]
-    learning_rate: [0.1]
-
 datasets:
   california_housing:
-    n_features:
-      min: 4
-      max: 6
-      step: 1
-    n_samples: [1000]
+    n_features: [4]
+    n_samples: [200]

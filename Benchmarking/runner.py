@@ -1,3 +1,4 @@
+import json
 import time
 from pathlib import Path
 from typing import Type
@@ -10,13 +11,10 @@ from .metrics import mean_abs_diff, relative_mae, sign_agreement, mean_sample_rh
 
 
 class BenchmarkRunner:
-    """Runs one exact reference + many approximation configs per (model, data) cell.
+    """Runs all backends per (model, data) cell and emits pairwise comparison rows.
 
-    The exact value is cheap (TreeSHAP/LinearSHAP via ``shap.Explainer``), so it is
-    recomputed in every cell and used as the in-memory ground truth — no caching.
-    Each approximation spec is a ``(backend_class, config)`` pair; the model is
-    wrapped in a ``CountingModel`` per spec so the real number of model evaluations
-    is recorded as the fair, library-agnostic budget axis.
+    Every backend runs once. Then for each ordered pair (candidate, reference)
+    the four accuracy metrics are computed and one CSV row is emitted.
     """
 
     def __init__(
@@ -35,8 +33,6 @@ class BenchmarkRunner:
         self.n_background = n_background
         self.n_eval = n_eval
         self.seed = seed
-        # imputer defines how a feature is masked (replaced with values drawn from the background distribution=
-        # marginal = independently of the other present features
         self.imputer = imputer
 
     def run(self, model, X: pd.DataFrame, run_meta: dict) -> None:
@@ -58,78 +54,87 @@ class BenchmarkRunner:
         else:
             X_eval = X.iloc[self.n_background:self.n_background + self.n_eval]
 
-        rows: list[dict] = []
-        oracle_name = self._oracle_name()
+        # --- run every backend once, record contributions and metadata ---
+        results: list[dict] = []
 
-        # --- exact reference backend(s): the first shap true_value is the oracle ---
-        true_contributions: dict[str, pd.DataFrame] = {}
-        true_runtimes: dict[str, float] = {}
         for cls in self.true_value_backends:
             t0 = time.perf_counter()
-            true_contributions[cls.name] = cls(model, background).run_explainer(X_eval)
-            true_runtimes[cls.name] = time.perf_counter() - t0
+            contrib = cls(model, background).run_explainer(X_eval)
+            runtime = time.perf_counter() - t0
+            results.append({
+                "cls": cls,
+                "config": {},
+                "contrib": contrib,
+                "runtime": runtime,
+                "n_model_evals": float("nan"),
+            })
 
-        oracle = true_contributions.get(oracle_name)
-        for cls in self.true_value_backends:
-            is_oracle = cls.name == oracle_name
-            rows.append(self._row(
-                run_meta, cls,
-                contrib=true_contributions[cls.name],
-                reference=None if is_oracle else oracle,
-                runtime=true_runtimes[cls.name],
-                approximator=None, budget=None, n_model_evals=None,
-                reference_backend=None if is_oracle else oracle_name,
-            ))
-
-        # --- approximation specs, each measured against the oracle ---
         for cls, config in self.approximation_specs:
             counter = CountingModel(model)
-            run_config = {**config, "seed": self.seed, "imputer": self.imputer}
+            run_config = {**config}
+            if self.seed is not None:
+                run_config["seed"] = self.seed
+            if self.imputer is not None:
+                run_config["imputer"] = self.imputer
             t0 = time.perf_counter()
             contrib = cls(counter, background, run_config).run_explainer(X_eval)
             runtime = time.perf_counter() - t0
-            rows.append(self._row(
-                run_meta, cls,
-                contrib=contrib, reference=oracle, runtime=runtime,
-                approximator=config.get("approximator"), budget=config.get("budget"),
-                n_model_evals=counter.n_rows, reference_backend=oracle_name,
-            ))
+            results.append({
+                "cls": cls,
+                "config": config,
+                "contrib": contrib,
+                "runtime": runtime,
+                "n_model_evals": counter.n_rows,
+            })
+
+        # --- emit one row per backend with pairwise metrics dict ---
+        rows: list[dict] = []
+        for candidate in results:
+            rows.append(self._row(run_meta, candidate, results))
 
         self._append_to_csv(rows)
 
-    def _row(self, run_meta, cls, *, contrib, reference, runtime, approximator,
-             budget, n_model_evals, reference_backend) -> dict:
-        if reference is not None:
-            mad = mean_abs_diff(contrib, reference)
-            rmae = relative_mae(contrib, reference)
-            sa = sign_agreement(contrib, reference)
-            msr = mean_sample_rho(contrib, reference)
-        else:
-            mad = rmae = sa = msr = float("nan")
+    def _row(self, run_meta, candidate, all_results) -> dict:
+        c_contrib = candidate["contrib"]
+        cls = candidate["cls"]
+        config = candidate["config"]
+
+        pairwise = {}
+        for reference in all_results:
+            ref_name = reference["cls"].name
+            if candidate is reference:
+                pairwise[ref_name] = {
+                    "mean_abs_diff": 0.0,
+                    "relative_mae": 0.0,
+                    "sign_agreement": float(sign_agreement(c_contrib, c_contrib)),
+                    "mean_sample_rho": 1.0,
+                }
+            else:
+                r_contrib = reference["contrib"]
+                pairwise[ref_name] = {
+                    "mean_abs_diff": mean_abs_diff(c_contrib, r_contrib),
+                    "relative_mae": relative_mae(c_contrib, r_contrib),
+                    "sign_agreement": sign_agreement(c_contrib, r_contrib),
+                    "mean_sample_rho": mean_sample_rho(c_contrib, r_contrib),
+                }
+
         return {
             **run_meta,
             "backend": cls.name,
             "library": cls.library,
             "computation_type": cls.computation_type,
-            "approximator": approximator if approximator is not None else float("nan"),
-            "budget": budget if budget is not None else float("nan"),
+            "approximator": config.get("approximator", float("nan")),
+            "budget": config.get("budget", float("nan")),
             "seed": self.seed if self.seed is not None else float("nan"),
             "imputer": self.imputer if self.imputer is not None else float("nan"),
-            "n_eval": len(contrib),
-            "runtime_s": round(runtime, 4),
-            "n_model_evals": n_model_evals if n_model_evals is not None else float("nan"),
-            "mean_abs_diff": mad,
-            "relative_mae": rmae,
-            "sign_agreement": sa,
-            "mean_sample_rho": msr,
-            "reference_backend": reference_backend if reference_backend is not None else float("nan"),
+            "n_eval": len(c_contrib),
+            "runtime_s": round(candidate["runtime"], 4),
+            "n_model_evals": candidate["n_model_evals"],
+            "shapley_values": json.dumps(c_contrib.values.flatten().tolist()),
+            "shapley_n_eval": c_contrib.shape[0],
+            "shapley_n_features": c_contrib.shape[1],
+            "pairwise_metrics": json.dumps(pairwise),
         }
-
-    def _oracle_name(self) -> str | None:
-        for cls in self.true_value_backends:
-            if cls.library == "shap":
-                return cls.name
-        return self.true_value_backends[0].name if self.true_value_backends else None
 
     def _append_to_csv(self, rows: list[dict]) -> None:
         df = pd.DataFrame(rows)
