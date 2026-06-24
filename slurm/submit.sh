@@ -12,9 +12,11 @@ cd "$REPO_ROOT"
 
 CONFIG="$1"
 if [ -z "$CONFIG" ]; then
-    echo "Usage: bash slurm/submit.sh <config_path>   (e.g. configs/config-accuracy.yaml)" >&2
+    echo "Usage: bash slurm/submit.sh <config_path>   (e.g. config-accuracy.yaml or configs/config-accuracy.yaml)" >&2
     exit 1
 fi
+# Allow passing just the filename: fall back to configs/ if not found as given.
+[ -f "$CONFIG" ] || CONFIG="configs/$CONFIG"
 CONFIG_NAME="$(basename "$CONFIG" .yaml)"
 OUTPUT_DIR="Benchmarking/slurm_results/$CONFIG_NAME"
 MERGED_CSV="Benchmarking/results_$CONFIG_NAME.csv"
