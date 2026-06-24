@@ -77,11 +77,12 @@ from Models.dataset_and_models import Dataset
 with open('configs/config.yaml') as f:
     cfg = yaml.safe_load(f)
 
+seed = cfg['benchmark']['seed']
 for ds_key, params in cfg['datasets'].items():
     for nf in params.get('n_features', [4]):
         for ns in params.get('n_samples', [1000]):
             print(f'Fetching {ds_key} nf={nf} ns={ns} ...')
-            Dataset[ds_key.upper()].load_dataset(n_features=nf, n_samples=ns)
+            Dataset[ds_key.upper()].load_dataset(n_features=nf, n_samples=ns, seed=seed)
 print('All datasets cached.')
 "
 ```

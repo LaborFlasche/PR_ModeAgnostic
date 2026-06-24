@@ -10,20 +10,21 @@ name = "pr-modeagnostic"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
+    "alibi[shap]>=0.9.6",
     "captum>=0.9.0",
-    "dalex>=1.8.0",
-    "ipykernel>=7.2.0",
-    "ipywidgets>=8.1.8",
+    "click>=8.4.1",
+    "graphviz>=0.21",
+    "pandas>=2.0.0",
+    "pygraphviz>=1.14",
     "lightgbm>=4.6.0",
     "lightshap>=0.1.12",
-    # dalex pins pandas<3; the rest of the stack (shap/shapiq/lightshap) works on 2.x,
-    # so the floor is relaxed from 3.0.3 to keep dalex installable.
-    "pandas>=2.3.3,<3",
-    "pyyaml>=6.0.3",
+    "pandas>=3.0.3",
     "scikit-learn>=1.8.0",
     "shap>=0.51.0",
+    "shapiq>=1.4.1",
+    "shapflow>=0.0.1",
     "shapiq>=1.4.1",
     "torch>=2.12.0",
     "woodelf-explainer>=0.4.3",
@@ -32,5 +33,5 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.3",
+    "ipykernel>=7.2.0",
 ]

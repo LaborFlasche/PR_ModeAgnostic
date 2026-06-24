@@ -1,5 +1,28 @@
-docs/
-**/__pycache__/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# uv / venv
 .venv/
-slurm/logs/
-Benchmarking/slurm_results/
+.python-cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Cursor
+.cursor/
+
+# Local results / scratch
+res.png
