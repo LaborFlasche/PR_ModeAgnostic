@@ -28,7 +28,8 @@ def main():
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
 
     df = df.drop_duplicates(
-        subset=["dataset", "model", "n_features", "n_samples", "backend", "approximator", "budget"],
+        subset=["dataset", "model", "n_features", "n_samples", "seed", "n_background",
+                "backend", "approximator", "budget"],
         keep="last",
     )
 
