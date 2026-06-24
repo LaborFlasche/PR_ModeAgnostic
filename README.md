@@ -92,6 +92,8 @@ Tree models (`xgboost`, `lightgbm`, and any sklearn tree model) can additionally
 uv run python slurm/run_benchmark.py --task-id 0 --config configs/config-tree.yaml
 ```
 
+Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchmark.py`'s sweep against `configs/config-tree.yaml` for interactive use.
+
 | Library | Modes | Order-2 interactions |
 |---|---|---|
 | `shap` (TreeSHAP) | path-dependent | yes — order-2 oracle |
@@ -156,6 +158,8 @@ Libraries/
   alibi.ipynb             # Production XAI — counterfactuals, anchors
   dalex.ipynb             # iBreakDown, PDP, variable importance
   shapleyflow.ipynb       # Graph-based path-decomposed Shapley values
+  library_merge.ipynb     # Model-agnostic sweep, interactive equivalent of run_benchmark.py
+  tree_library_merge.ipynb # Tree-specific sweep, interactive equivalent of run_benchmark.py --config configs/config-tree.yaml
 Models/
   dataset_and_models.py   # Dataset and Model enums / definitions
   trainers.py             # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
