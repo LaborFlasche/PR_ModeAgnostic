@@ -12,12 +12,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "alibi[shap]>=0.9.6",
     "captum>=0.9.0",
     "click>=8.4.1",
     "graphviz>=0.21",
     "pandas>=2.0.0",
-    "pygraphviz>=1.14",
     "lightgbm>=4.6.0",
     "lightshap>=0.1.12",
     "pandas>=3.0.3",
@@ -29,6 +27,7 @@ dependencies = [
     "torch>=2.12.0",
     "woodelf-explainer>=0.4.3",
     "xgboost>=2.0.0",
+    "dalex>=1.7.2",
 ]
 
 [dependency-groups]
