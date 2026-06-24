@@ -27,6 +27,7 @@ benchmark:
   # and it is controlled from this one field. "marginal" is currently the only supported
   # value; a backend raises if asked for anything it cannot honor.
   imputer: marginal
+  # Tree-specific backends and models live in configs/config-tree.yaml instead.
 
 models:
   random_forest:

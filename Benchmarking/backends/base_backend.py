@@ -9,6 +9,7 @@ class BaseBackend(ABC):
     name: str
     library: str
     computation_type: Literal["true_value", "approximation"]
+    order: int = 1  # 1 = Shapley values, 2 = pairwise interactions
 
     def __init__(self, model, background: pd.DataFrame, config: dict | None = None):
         self.model = model
@@ -21,30 +22,21 @@ class BaseBackend(ABC):
 
 
 def marginal_predict(model, columns):
-    """Scalar value function in each model's *natural additive* output space.
+    """Scalar value function in each model's natural additive output space
+    (regressors -> predict, XGBClassifier -> margin, other classifiers with
+    decision_function -> log-odds margin, else -> predict_proba), matching what
+    the shap oracle is additive in. Binary -> class 1, multiclass -> class 0.
 
-    The exact oracle (``ShapTrueValueBackend``) uses shap's model-specific explainer,
-    which attributes whatever output space that model is additive in:
-
-    * regressors -> the raw ``predict`` value;
-    * models with ``decision_function`` (gradient boosting, linear classifiers) -> the
-      **log-odds margin**, the only space where TreeSHAP/LinearSHAP are *exact* for
-      them (in probability space they are not, and there is no polynomial exact method
-      at high feature counts);
-    * the remaining classifiers (RandomForest / DecisionTree, whose leaves already
-      store class probabilities) -> ``predict_proba``.
-
-    Every approximation backend calls this, so within each (model, dataset) cell it
-    targets the *same* function as the oracle — the only thing the accuracy metrics
-    compare. (Targeting ``predict_proba`` for boosting/linear classifiers would chase a
-    different function than the margin-space oracle, making those rows meaningless.)
-    Binary -> class 1, multiclass -> class 0, mirroring the oracle's reduction. Inputs
-    are wrapped back into a DataFrame with the original column names to avoid sklearn's
-    "missing feature names" warning and keep encodings aligned.
+    XGBoost is detected via module name, not isinstance, to avoid importing
+    xgboost here — doing so before shapiq segfaults shapiq's interventional
+    TreeExplainer later in the process (see tree_shapiq_backend.py).
     """
 
     def f(X) -> np.ndarray:
         df = X if isinstance(X, pd.DataFrame) else pd.DataFrame(np.asarray(X), columns=columns)
+        if type(model).__module__.startswith("xgboost") and hasattr(model, "predict_proba"):
+            out = np.asarray(model.predict(df, output_margin=True), dtype=float)
+            return out if out.ndim == 1 else out[:, 0]
         if hasattr(model, "decision_function"):
             out = np.asarray(model.decision_function(df), dtype=float)
             return out if out.ndim == 1 else out[:, 0]
@@ -54,3 +46,52 @@ def marginal_predict(model, columns):
         return np.asarray(model.predict(df), dtype=float)
 
     return f
+
+
+def nan_result(x: pd.DataFrame) -> pd.DataFrame:
+    """All-NaN frame for a backend that can't run on this (model, dataset) cell,
+    so one unsupported combination skips instead of crashing the whole sweep."""
+    return pd.DataFrame(np.nan, index=x.index, columns=x.columns)
+
+
+def reduce_multiclass(values: np.ndarray | list, order: int = 1) -> np.ndarray:
+    """Normalize a tree-explainer's raw output to a single (n_samples, ...) array:
+    some libraries return a list of per-class arrays, others a trailing class
+    axis. Binary -> class 1, multiclass -> class 0, matching ShapTrueValueBackend.
+
+    ``order`` disambiguates a trailing class axis from a same-sized feature axis
+    (a regression interaction array is already (n, d, d), same ndim as a
+    multiclass first-order array) — only "ndim beyond order+1" means a class axis.
+    """
+    if isinstance(values, list):
+        idx = 1 if len(values) == 2 else 0
+        return np.asarray(values[idx])
+    arr = np.asarray(values)
+    if arr.ndim > order + 1:
+        return arr[..., 1] if arr.shape[-1] == 2 else arr[..., 0]
+    return arr
+
+
+def flatten_interactions(values: np.ndarray, x: pd.DataFrame) -> pd.DataFrame:
+    """Flatten a (n, d, d) interaction array into a (n, d**2) DataFrame with
+    paired column names (e.g. "f0__f1"), so interaction backends reuse
+    runner.py/metrics.py unchanged."""
+    n, d, _ = values.shape
+    cols = [f"{a}__{b}" for a in x.columns for b in x.columns]
+    return pd.DataFrame(values.reshape(n, d * d), index=x.index, columns=cols)
+
+
+def nan_interaction_result(x: pd.DataFrame) -> pd.DataFrame:
+    """``nan_result`` for interaction backends (d**2 columns)."""
+    cols = [f"{a}__{b}" for a in x.columns for b in x.columns]
+    return pd.DataFrame(np.nan, index=x.index, columns=cols)
+
+
+def cuda_available() -> bool:
+    """xgboost's device="cuda" silently falls back to CPU instead of raising
+    when no GPU is present, so GPU-gated backends check this explicitly."""
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except Exception:
+        return False

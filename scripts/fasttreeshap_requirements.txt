@@ -1,0 +1,10 @@
+# numpy<2 forces Python<=3.10, hence older xgboost/scikit-learn pins than main
+# project. xgboost here is just so the venv installs — fasttreeshap 0.1.6 still
+# can't parse XGBoost 3.x's model format at all; FastTreeShapBackend skips
+# XGBoost outright. LightGBM/sklearn models work fine.
+numpy<2
+pandas
+fasttreeshap
+xgboost==3.2.0
+lightgbm==4.6.0
+scikit-learn==1.7.2

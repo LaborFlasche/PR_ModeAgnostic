@@ -60,3 +60,245 @@ def test_shapiq_true_value_metadata():
     assert ShapIQTrueValueBackend.library == "shapiq"
     assert ShapIQTrueValueBackend.computation_type == "true_value"
     assert ShapIQTrueValueBackend.name == "shapiq_true_value"
+
+
+from Benchmarking.backends.tree_shap_backend import ShapTreePathDependentBackend
+# ShapIQTreeInterventionalBackend not exercised here: it crashes unreliably (see its docstring).
+from Benchmarking.backends.tree_shapiq_backend import ShapIQTreePathDependentBackend
+from Benchmarking.backends.woodelf_backend import (
+    WoodelfTreePathDependentBackend,
+    WoodelfTreeInterventionalBackend,
+)
+
+
+@pytest.mark.parametrize("backend_cls", [
+    ShapTreePathDependentBackend,
+    ShapIQTreePathDependentBackend,
+    WoodelfTreePathDependentBackend,
+    WoodelfTreeInterventionalBackend,
+])
+def test_tree_backend_shape_and_columns(toy_rf, backend_cls):
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    backend = backend_cls(model, background)
+    contrib = backend.run_explainer(X_eval)
+    assert contrib.shape == (5, 3)
+    assert list(contrib.columns) == ["f0", "f1", "f2"]
+
+
+def test_woodelf_skips_multiclass(toy_rf):
+    model, X = toy_rf
+    model.objective = "multi:softmax"  # simulate a multiclass model
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    backend = WoodelfTreePathDependentBackend(model, background)
+    contrib = backend.run_explainer(X_eval)
+    assert contrib.isna().all().all()
+
+
+from Benchmarking.backends.fasttreeshap_backend import FastTreeShapBackend
+
+
+def test_fasttreeshap_skips_when_venv_missing(toy_rf, monkeypatch):
+    monkeypatch.setenv("FASTTREESHAP_VENV_PYTHON", "/nonexistent/python")
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    backend = FastTreeShapBackend(model, background)
+    contrib = backend.run_explainer(X_eval)
+    assert contrib.shape == (5, 3)
+    assert contrib.isna().all().all()
+
+
+from Models.dataset_and_models import Model
+
+
+def test_model_is_tree():
+    assert Model.RANDOM_FOREST.is_tree
+    assert Model.DECISION_TREE.is_tree
+    assert Model.GRADIENT_BOOSTING.is_tree
+    assert Model.XGBOOST.is_tree
+    assert Model.LIGHTGBM.is_tree
+    assert not Model.LINEAR_BASELINE.is_tree
+    assert not Model.LINEAR_REGULARIZED.is_tree
+    assert not Model.PYTORCH_NEURAL_NETWORK.is_tree
+
+
+# Duck-typed fake, not real xgboost: importing xgboost alongside shapiq's
+# interventional TreeExplainer (exercised above) segfaults in this dependency stack.
+class _FakeXGBClassifier:
+    __module__ = "xgboost.sklearn"
+
+    def predict_proba(self, X):
+        return np.tile([0.7, 0.3], (len(X), 1))
+
+    def predict(self, X, output_margin=False):
+        assert output_margin is True
+        return np.arange(len(X), dtype=float)
+
+
+def test_marginal_predict_xgboost_classifier_uses_margin():
+    from Benchmarking.backends.base_backend import marginal_predict
+    X = pd.DataFrame(np.zeros((5, 3)), columns=["f0", "f1", "f2"])
+    f = marginal_predict(_FakeXGBClassifier(), X.columns)
+    np.testing.assert_allclose(f(X), np.arange(5, dtype=float))
+
+
+# --- Interaction (order-2) backends -----------------------------------------
+
+from Benchmarking.backends.tree_shap_backend import ShapInteractionBackend
+from Benchmarking.backends.tree_shapiq_backend import ShapIQInteractionBackend
+from Benchmarking.backends.woodelf_backend import WoodelfInteractionBackend
+
+
+@pytest.mark.parametrize("backend_cls", [
+    ShapInteractionBackend,
+    ShapIQInteractionBackend,
+    WoodelfInteractionBackend,
+])
+def test_interaction_backend_shape_and_columns(toy_rf, backend_cls):
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    backend = backend_cls(model, background)
+    contrib = backend.run_explainer(X_eval)
+    assert backend_cls.order == 2
+    assert contrib.shape == (5, 9)  # 3 features -> 3*3 flattened columns
+    assert list(contrib.columns) == [f"{a}__{b}" for a in X.columns for b in X.columns]
+
+
+def test_woodelf_interaction_skips_multiclass(toy_rf):
+    model, X = toy_rf
+    model.objective = "multi:softmax"
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    contrib = WoodelfInteractionBackend(model, background).run_explainer(X_eval)
+    assert contrib.shape == (5, 9)
+    assert contrib.isna().all().all()
+
+
+# --- Axiom/correctness regression tests --------------------------------------
+# Tolerances are set from values measured live on this toy_rf fixture, not
+# guessed defaults.
+
+def test_woodelf_interventional_efficiency(toy_rf):
+    """sum(shap_values_row) + E[f(background)] ~= f(x): the efficiency axiom.
+    Path-dependent backends use a different value definition and don't satisfy
+    this against a background mean — see test_path_dependent_backends_agree."""
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    contrib = WoodelfTreeInterventionalBackend(model, background).run_explainer(X_eval)
+    baseline = model.predict(background).mean()
+    total = contrib.sum(axis=1).to_numpy() + baseline
+    np.testing.assert_allclose(total, model.predict(X_eval), atol=1e-6)
+
+
+def test_path_dependent_backends_agree(toy_rf):
+    """shap, shapiq, and woodelf's path-dependent TreeExplainers compute the
+    same value (no background), so they should agree with each other directly
+    rather than against a baseline."""
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    shap_vals = ShapTreePathDependentBackend(model, background).run_explainer(X_eval).to_numpy()
+    shapiq_vals = ShapIQTreePathDependentBackend(model, background).run_explainer(X_eval).to_numpy()
+    woodelf_vals = WoodelfTreePathDependentBackend(model, background).run_explainer(X_eval).to_numpy()
+    np.testing.assert_allclose(shapiq_vals, shap_vals, atol=1e-6)
+    np.testing.assert_allclose(woodelf_vals, shap_vals, atol=1e-4)
+
+
+@pytest.mark.parametrize("backend_cls,atol", [
+    (ShapInteractionBackend, 1e-6),
+    (WoodelfInteractionBackend, 1e-4),
+])
+def test_interaction_row_sum_matches_own_first_order(toy_rf, backend_cls, atol):
+    """sum_j interaction(i, j) == first-order Shapley value(i): the interaction
+    axiom shap/woodelf both fold onto the diagonal. shapiq is excluded here —
+    see test_shapiq_interaction_self_consistent and ShapIQInteractionBackend's
+    docstring for why it needs a different check."""
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    d = X.shape[1]
+
+    sv_backend_cls = {
+        ShapInteractionBackend: ShapTreePathDependentBackend,
+        WoodelfInteractionBackend: WoodelfTreePathDependentBackend,
+    }[backend_cls]
+    sv = sv_backend_cls(model, background).run_explainer(X_eval).to_numpy()
+    interactions = backend_cls(model, background).run_explainer(X_eval).to_numpy().reshape(len(X_eval), d, d)
+    row_sums = interactions.sum(axis=2)
+    np.testing.assert_allclose(row_sums, sv, atol=atol)
+
+
+def test_shapiq_interaction_self_consistent(toy_rf):
+    """The row-sum axiom holds by construction within a single explainer call
+    (the diagonal is built from that call's own order-1 byproduct) — guards
+    against a refactor breaking that construction."""
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    d = X.shape[1]
+    n_classes = getattr(model, "n_classes_", 2)
+    class_index = 1 if n_classes == 2 else 0
+
+    import shapiq
+    explainer = shapiq.TreeExplainer(
+        model, mode="pathdependent", max_order=2, min_order=1, index="k-SII", class_index=class_index,
+    )
+    results = explainer.explain_X(X_eval.values, n_jobs=1)
+    sv_byproduct = np.stack([np.asarray(iv.get_n_order_values(1)).ravel() for iv in results])
+
+    interactions = ShapIQInteractionBackend(model, background).run_explainer(X_eval).to_numpy().reshape(len(X_eval), d, d)
+    row_sums = interactions.sum(axis=2)
+    np.testing.assert_allclose(row_sums, sv_byproduct, atol=1e-10)
+
+
+# --- GPU-gated backends: skip-path only (no CUDA on this machine) -----------
+
+from Benchmarking.backends.woodelf_backend import (
+    WoodelfGPUPathDependentBackend,
+    WoodelfGPUInterventionalBackend,
+)
+from Benchmarking.backends.gputreeshap_backend import (
+    GPUTreeShapBackend,
+    GPUTreeShapInteractionBackend,
+)
+
+
+@pytest.mark.parametrize("backend_cls", [
+    WoodelfGPUPathDependentBackend,
+    WoodelfGPUInterventionalBackend,
+])
+def test_woodelf_gpu_skips_without_cuda(toy_rf, backend_cls, monkeypatch):
+    monkeypatch.setattr("Benchmarking.backends.woodelf_backend.cuda_available", lambda: False)
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    contrib = backend_cls(model, background).run_explainer(X_eval)
+    assert contrib.shape == (5, 3)
+    assert contrib.isna().all().all()
+
+
+@pytest.mark.parametrize("backend_cls,expected_cols", [
+    (GPUTreeShapBackend, ["f0", "f1", "f2"]),
+    (GPUTreeShapInteractionBackend, [f"{a}__{b}" for a in ["f0", "f1", "f2"] for b in ["f0", "f1", "f2"]]),
+])
+def test_gputreeshap_skips_for_non_xgboost_model(toy_rf, backend_cls, expected_cols):
+    model, X = toy_rf  # toy_rf is a RandomForestRegressor, not XGBoost
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    contrib = backend_cls(model, background).run_explainer(X_eval)
+    assert list(contrib.columns) == expected_cols
+    assert contrib.isna().all().all()
+
+
+def test_gputreeshap_skips_xgboost_without_cuda(monkeypatch):
+    monkeypatch.setattr("Benchmarking.backends.gputreeshap_backend.cuda_available", lambda: False)
+    X = pd.DataFrame(np.zeros((5, 3)), columns=["f0", "f1", "f2"])
+    background = X.iloc[:3]
+    contrib = GPUTreeShapBackend(_FakeXGBClassifier(), background).run_explainer(X)
+    assert contrib.shape == (5, 3)
+    assert contrib.isna().all().all()

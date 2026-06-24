@@ -1,18 +1,21 @@
 from sklearn.ensemble import (
-    RandomForestRegressor, 
+    RandomForestRegressor,
     RandomForestClassifier,
-    HistGradientBoostingRegressor, 
+    HistGradientBoostingRegressor,
     HistGradientBoostingClassifier
 )
 from sklearn.linear_model import (
-    LinearRegression, 
-    LogisticRegression, 
+    LinearRegression,
+    LogisticRegression,
     Ridge
 )
 from sklearn.tree import (
-    DecisionTreeRegressor, 
+    DecisionTreeRegressor,
     DecisionTreeClassifier
 )
+# xgboost/lightgbm are imported lazily below (not at module level): importing
+# xgboost before shapiq segfaults shapiq's interventional TreeExplainer later —
+# see tree_shapiq_backend.py.
 
 from Datasets.load_datasets import (
     load_california_housing,
@@ -65,11 +68,23 @@ class Model(Enum):
     # 4) Baum-Ensembles
     RANDOM_FOREST = "random_forest"
     GRADIENT_BOOSTING = "gradient_boosting"
-    
+    XGBOOST = "xgboost"
+    LIGHTGBM = "lightgbm"
+
     # 3) Neuronale Netzwerke (PyTorch)
     PYTORCH_NEURAL_NETWORK = "pytorch_neural_network"
-    
-    def get_model(self, dataset: Dataset):        
+
+    @property
+    def is_tree(self) -> bool:
+        return self in {
+            Model.DECISION_TREE,
+            Model.RANDOM_FOREST,
+            Model.GRADIENT_BOOSTING,
+            Model.XGBOOST,
+            Model.LIGHTGBM,
+        }
+
+    def get_model(self, dataset: Dataset):
         is_reg = dataset.is_regression
         
         if self == Model.LINEAR_BASELINE:
@@ -91,7 +106,19 @@ class Model(Enum):
         elif self == Model.GRADIENT_BOOSTING:
             model = HistGradientBoostingRegressor(random_state=42) if is_reg else HistGradientBoostingClassifier(random_state=42)
             return SklearnTrainer(model)
-            
+
+        elif self == Model.XGBOOST:
+            from xgboost import XGBRegressor, XGBClassifier
+            # enable_categorical defaults to True in xgboost>=3.0, which makes shap's
+            # TreeExplainer reject the model outright.
+            model = XGBRegressor(random_state=42, enable_categorical=False) if is_reg else XGBClassifier(random_state=42, enable_categorical=False)
+            return SklearnTrainer(model)
+
+        elif self == Model.LIGHTGBM:
+            from lightgbm import LGBMRegressor, LGBMClassifier
+            model = LGBMRegressor(random_state=42, verbosity=-1) if is_reg else LGBMClassifier(random_state=42, verbosity=-1)
+            return SklearnTrainer(model)
+
         elif self == Model.PYTORCH_NEURAL_NETWORK:
             return PytorchTrainer()
             
@@ -145,6 +172,24 @@ class Model(Enum):
                 model = HistGradientBoostingRegressor(**{**base, **params})
             else:
                 model = HistGradientBoostingClassifier(**{**base, **params})
+            return SklearnTrainer(model)
+
+        elif self == Model.XGBOOST:
+            from xgboost import XGBRegressor, XGBClassifier
+            base_xgb = {**base, 'enable_categorical': False}
+            if is_reg:
+                model = XGBRegressor(**{**base_xgb, **params})
+            else:
+                model = XGBClassifier(**{**base_xgb, **params})
+            return SklearnTrainer(model)
+
+        elif self == Model.LIGHTGBM:
+            from lightgbm import LGBMRegressor, LGBMClassifier
+            base_lgbm = {**base, 'verbosity': -1}
+            if is_reg:
+                model = LGBMRegressor(**{**base_lgbm, **params})
+            else:
+                model = LGBMClassifier(**{**base_lgbm, **params})
             return SklearnTrainer(model)
 
         else:

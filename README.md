@@ -18,7 +18,7 @@ The goal is to evaluate whether `shapiq` is the best-in-class library for Shaple
 | `dalex` | Broad explainability | iBreakDown | Model-agnostic; R-origin, Python port |
 | `shapleyflow` | Graph-based Shapley influence | High-order (graph paths) | Decomposes feature effects into direct vs. mediated paths |
 
-Excluded (tree-specific only): `woodelf`, `fastTreeSHAP`, `GPUTreeSHAP`.
+Tree-specific only (not in the table above; see [Tree-specific benchmark](#tree-specific-benchmark)): `woodelf`, `fastTreeSHAP`, `GPUTreeSHAP`.
 
 ## Research questions
 
@@ -44,7 +44,7 @@ Stored in `Datasets/`. See `Datasets/dataset.md` for full details on feature enc
 
 ## Benchmark configuration
 
-Model hyperparameters and dataset sweep ranges are defined in `config.yaml`. Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand them into all benchmark combinations:
+Model hyperparameters and dataset sweep ranges are defined in `configs/config.yaml` (model-agnostic) and `configs/config-tree.yaml` (tree-specific — see below). Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand either into all benchmark combinations:
 
 ```python
 from itertools import product
@@ -52,7 +52,7 @@ from sklearn.model_selection import ParameterGrid
 from Models.config_parser import load_config, load_dataset_config, load_seed
 from Models.dataset_and_models import Dataset
 
-CONFIG = "config.yaml"
+CONFIG = "configs/config.yaml"
 
 model_config   = load_config(CONFIG)        # {model_key: {param: [values]}}
 dataset_config = load_dataset_config(CONFIG) # {dataset_key: {n_features: [...], n_samples: [...]}}
@@ -83,6 +83,29 @@ X, y = ds["X"], ds["y"]
 ```
 
 Features within each dataset are reduced by ranking on variance (`VarianceThreshold`) and keeping the top `n_features`; samples are drawn randomly with `random_state=42`.
+
+## Tree-specific benchmark
+
+Tree models (`xgboost`, `lightgbm`, and any sklearn tree model) can additionally be benchmarked against tree-specific exact/true-value SHAP backends, run via a separate config so the model-agnostic sweep above stays untouched:
+
+```bash
+uv run python slurm/run_benchmark.py --task-id 0 --config configs/config-tree.yaml
+```
+
+| Library | Modes | Order-2 interactions |
+|---|---|---|
+| `shap` (TreeSHAP) | path-dependent | yes — order-2 oracle |
+| `shapiq` (TreeSHAP-IQ) | path-dependent | yes |
+| `woodelf` | path-dependent, interventional | yes |
+| `fasttreeshap` | path-dependent | no |
+
+`fasttreeshap` requires `numpy<2`, incompatible with this project's main `numpy>=2` stack, so it runs out-of-process in a dedicated venv — provision it once with `bash scripts/setup_fasttreeshap_env.sh`. It also can't parse XGBoost 3.x's model format (an upstream limitation) and is skipped for XGBoost models specifically.
+
+`shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `Benchmarking/backends/tree_shapiq_backend.py`).
+
+GPU-backed variants (`woodelf` with `GPU=True`, and XGBoost's native GPU SHAP path under the name `gputreeshap`) exist in `Benchmarking/backends/` for future use but aren't currently wired into `configs/config-tree.yaml` or `slurm/run_benchmark.py` — no GPU hardware has been available to verify them yet.
+
+`configs/config-tree.yaml`'s `tree_libraries`/`tree_modes`/`interaction_libraries` control which of the above run; `interaction_max_features` caps interaction sweeps since their output is quadratic in feature count.
 
 ## Setup
 
@@ -141,7 +164,18 @@ Models/
 Datasets/
   load_datasets.py        # Dataset download and caching helpers (support n_features / n_samples)
   dataset.md              # Dataset documentation incl. encoding strategy and feature-selection notes
-config.yaml               # Hyperparameter grids for models and sweep ranges for datasets
-pyproject.toml            # Project metadata and dependencies
-uv.lock                   # Locked dependency versions (commit this)
+Benchmarking/
+  runner.py                # BenchmarkRunner — runs one oracle + backends/approximations per cell
+  metrics.py                # mean_abs_diff, sign_agreement, mean_sample_rho, runtime
+  backends/                 # one BaseBackend subclass per (library, mode); tree_*.py / woodelf_backend.py /
+                             # fasttreeshap_backend.py / gputreeshap_backend.py are the tree-specific ones
+configs/
+  config.yaml               # Model-agnostic benchmark config (hyperparameters, dataset sweeps, approximators)
+  config-tree.yaml          # Tree-specific config — see "Tree-specific benchmark" above
+slurm/                      # SLURM array-job scripts; see SLURM.md
+scripts/
+  setup_fasttreeshap_env.sh # Provisions the dedicated venv fasttreeshap runs in (numpy<2)
+tests/                      # pytest suite for backends, runner, and metrics
+pyproject.toml              # Project metadata and dependencies
+uv.lock                     # Locked dependency versions (commit this)
 ```

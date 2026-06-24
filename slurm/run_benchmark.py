@@ -12,6 +12,12 @@ import os
 import sys
 import warnings
 
+# xgboost/lightgbm must be imported before shapiq anywhere in this process, or a
+# later xgboost/lightgbm .fit() segfaults — establishes safe load order before
+# `from Benchmarking.backends import (...)` pulls in shapiq.
+import xgboost  # noqa: F401
+import lightgbm  # noqa: F401
+
 warnings.filterwarnings("ignore", message="Not all budget.*", category=UserWarning, module="shapiq")
 warnings.filterwarnings("ignore", message="The sample size is larger.*", category=UserWarning, module="shapiq")
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", category=UserWarning)
@@ -28,13 +34,41 @@ from Benchmarking.backends import (
     ShapIQApproxBackend,
     LightShapApproxBackend,
     DalexApproxBackend,
+    ShapTreePathDependentBackend,
+    ShapInteractionBackend,
+    ShapIQTreePathDependentBackend,
+    ShapIQInteractionBackend,
+    WoodelfTreePathDependentBackend,
+    WoodelfTreeInterventionalBackend,
+    WoodelfInteractionBackend,
+    FastTreeShapBackend,
 )
+# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in Benchmarking.backends for
+# future use but aren't wired in here for now.
 
 APPROX_MAP = {
     "shap": ShapApproxBackend,
     "shapiq": ShapIQApproxBackend,
     "lightshap": LightShapApproxBackend,
     "dalex": DalexApproxBackend,
+}
+
+# Tree-specific true-value backends, only applied to tree models (Model.is_tree).
+# Keyed by (library, mode). No ("shapiq_tree", "interventional") entry: it
+# crashes in this dependency stack — see tree_shapiq_backend.py.
+TREE_TRUE_VALUE_MAP = {
+    ("shap_tree", "path_dependent"): ShapTreePathDependentBackend,
+    ("shapiq_tree", "path_dependent"): ShapIQTreePathDependentBackend,
+    ("woodelf", "path_dependent"): WoodelfTreePathDependentBackend,
+    ("woodelf", "interventional"): WoodelfTreeInterventionalBackend,
+    ("fasttreeshap", "path_dependent"): FastTreeShapBackend,
+}
+
+# Pairwise-interaction (order-2) backends, path-dependent only. "shap_tree" is
+# absent: ShapInteractionBackend is hardcoded as the always-on oracle below.
+INTERACTION_TRUE_VALUE_MAP = {
+    "shapiq_tree": ShapIQInteractionBackend,
+    "woodelf": WoodelfInteractionBackend,
 }
 
 
@@ -85,8 +119,19 @@ def main():
     if os.path.exists(output_csv):
         os.remove(output_csv)
 
+    model_enum = Model[mk.upper()]
+
+    # ShapTrueValueBackend must stay first: it's picked as the oracle.
+    true_value_backends = [ShapTrueValueBackend]
+    if model_enum.is_tree:
+        for lib in bench.get("tree_libraries", []):
+            for mode in bench.get("tree_modes", []):
+                cls = TREE_TRUE_VALUE_MAP.get((lib, mode))
+                if cls is not None:
+                    true_value_backends.append(cls)
+
     runner = BenchmarkRunner(
-        true_value_backends=[ShapTrueValueBackend],
+        true_value_backends=true_value_backends,
         approximation_specs=approx_specs,
         output_csv=output_csv,
         n_background=bench["n_background"],
@@ -97,14 +142,46 @@ def main():
 
     dataset_enum = Dataset[dk.upper()]
     ds = dataset_enum.load_dataset(**dp, seed=seed)
-    trainer = Model[mk.upper()].get_model_with_params(dataset_enum, mp, seed=seed)
+    trainer = model_enum.get_model_with_params(dataset_enum, mp, seed=seed)
     trainer.fit(ds["X"], ds["y"], task=ds["task"])
 
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, **dp},
+        run_meta={"dataset": dk, "model": mk, "order": 1, **dp},
     )
+
+    # Pairwise interactions: a separate runner.run() call (different oracle,
+    # different output shape) writing to the same output_csv.
+    interaction_libs = bench.get("interaction_libraries", [])
+    if model_enum.is_tree and interaction_libs:
+        max_features = bench.get("interaction_max_features", 16)
+        if ds["X"].shape[1] > max_features:
+            print(f"[task {args.task_id}] skipping interactions: "
+                  f"n_features={ds['X'].shape[1]} > interaction_max_features={max_features}")
+        else:
+            # ShapInteractionBackend must stay first: it's the order-2 oracle.
+            interaction_backends = [ShapInteractionBackend]
+            for lib in interaction_libs:
+                cls = INTERACTION_TRUE_VALUE_MAP.get(lib)
+                if cls is not None:
+                    interaction_backends.append(cls)
+
+            interaction_runner = BenchmarkRunner(
+                true_value_backends=interaction_backends,
+                approximation_specs=[],
+                output_csv=output_csv,
+                n_background=bench["n_background"],
+                n_eval=bench["n_eval"],
+                seed=seed,
+                imputer=imputer,
+            )
+            interaction_runner.run(
+                model=trainer.get_model(),
+                X=ds["X"],
+                run_meta={"dataset": dk, "model": mk, "order": 2, **dp},
+            )
+
     print(f"[task {args.task_id}] done -> {output_csv}")
 
 
