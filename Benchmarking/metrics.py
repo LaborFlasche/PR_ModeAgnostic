@@ -7,18 +7,19 @@ def mean_abs_diff(a: pd.DataFrame, b: pd.DataFrame) -> float:
     return float((a - b).abs().mean().mean())
 
 
-def relative_mae(approx: pd.DataFrame, exact: pd.DataFrame) -> float:
-    """Scale-free accuracy: MAE normalized by the mean magnitude of the exact values.
+def relative_mae(a: pd.DataFrame, b: pd.DataFrame) -> float:
+    """Scale-free accuracy: MAE normalized by the mean magnitude of both values.
 
     ``mean_abs_diff`` is in the units of the model output (house prices vs.
     probabilities), so it cannot be averaged across datasets. Dividing by
-    ``mean|exact|`` yields a dimensionless error (0 = perfect) that is comparable
-    across datasets and models. Returns NaN when the exact values are all zero.
+    the average magnitude of both DataFrames yields a dimensionless error
+    (0 = perfect) that is comparable across datasets and models, and is symmetric.
+    Returns NaN when both DataFrames are zero.
     """
-    denom = float(exact.abs().mean().mean())
+    denom = float((a.abs().values + b.abs().values).mean()) / 2.0
     if denom == 0:
         return float("nan")
-    return mean_abs_diff(approx, exact) / denom
+    return mean_abs_diff(a, b) / denom
 
 
 def sign_agreement(a: pd.DataFrame, b: pd.DataFrame) -> float:
