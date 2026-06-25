@@ -1,8 +1,9 @@
 #!/bin/bash
 # Run this from the repo root:  bash slurm/submit.sh [config_path]
 # Defaults to configs/config.yaml (model-agnostic). Run again with
-# configs/config-tree.yaml for the tree-specific sweep — each config gets its
-# own output directory and merged CSV so the two runs don't collide.
+# configs/config-tree.yaml for the tree-specific sweep or
+# configs/config-neural-networks-RQ3.yaml for the NN sweep — each config gets
+# its own output directory and merged CSV so the runs don't collide.
 # It submits the array job and then a merge job that waits for it.
 
 set -e
@@ -26,10 +27,18 @@ mkdir -p slurm/logs "$OUTPUT_DIR"
 mkdir -p Benchmarking/slurm_results
 rm -f Benchmarking/slurm_results/results_*.csv
 
+# Pick the right array script: NN configs use run_benchmark_nn.py, others use
+# run_benchmark.py.
+if [[ "$CONFIG" == *neural-networks* ]]; then
+    ARRAY_SCRIPT="slurm/bench_array_nn.sh"
+else
+    ARRAY_SCRIPT="slurm/bench_array.sh"
+fi
+
 ARRAY_JOB=$(sbatch \
     --array=0-$((N - 1)) \
     --chdir="$REPO_ROOT" \
-    slurm/bench_array.sh "$CONFIG" "$OUTPUT_DIR" \
+    "$ARRAY_SCRIPT" "$CONFIG" "$OUTPUT_DIR" \
     | awk '{print $4}')
 echo "Array job ID: $ARRAY_JOB"
 
