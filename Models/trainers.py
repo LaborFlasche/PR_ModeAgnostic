@@ -18,6 +18,11 @@ class SklearnTrainer(ModelTrainer):
         self._estimator = estimator
 
     def fit(self, X, y, task: str = "regression"):
+        if task == "classification":
+            # xgboost requires labels in canonical 0..n_classes-1 form (e.g. gisette's
+            # -1/1 raises error); other sklearn classifiers don't care. Sorted-order remap
+            # preserves which class lands in column 1 downstream (base_backend.py).
+            y = np.unique(y, return_inverse=True)[1]
         self._estimator.fit(X, y)
         return self
 
