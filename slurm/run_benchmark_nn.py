@@ -80,6 +80,11 @@ def main():
     seed = bench["seed"]
     imputer = bench["imputer"]
 
+    # Support scalar or list for n_background (normalise for forward-compat).
+    n_backgrounds = bench["n_background"]
+    if isinstance(n_backgrounds, int):
+        n_backgrounds = [n_backgrounds]
+
     approx_specs = [
         (APPROX_MAP[lib], {"approximator": appr, "budget": bgt})
         for lib in bench["libraries"]
@@ -101,27 +106,27 @@ def main():
         if cls is not None:
             true_value_backends.append(cls)
 
-    runner = BenchmarkRunner(
-        true_value_backends=true_value_backends,
-        approximation_specs=approx_specs,
-        output_csv=output_csv,
-        n_background=bench["n_background"],
-        n_eval=bench["n_eval"],
-        seed=seed,
-        imputer=imputer,
-    )
-
     dataset_enum = Dataset[dk.upper()]
     ds = dataset_enum.load_dataset(**dp, seed=seed)
     device = bench.get("device", "cpu")
     trainer = model_enum.get_model_with_params(dataset_enum, {**mp, "device": device}, seed=seed)
     trainer.fit(ds["X"], ds["y"], task=ds["task"])
 
-    runner.run(
-        model=trainer.get_model(),
-        X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, "order": 1, **dp},
-    )
+    for nbg in n_backgrounds:
+        runner = BenchmarkRunner(
+            true_value_backends=true_value_backends,
+            approximation_specs=approx_specs,
+            output_csv=output_csv,
+            n_background=nbg,
+            n_eval=bench["n_eval"],
+            seed=seed,
+            imputer=imputer,
+        )
+        runner.run(
+            model=trainer.get_model(),
+            X=ds["X"],
+            run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": nbg, **dp},
+        )
 
     print(f"[task {args.task_id}] done -> {output_csv}")
 
