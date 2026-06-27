@@ -4,6 +4,12 @@ from sklearn.model_selection import ParameterGrid
 from Models.dataset_and_models import Dataset, Model
 
 
+def as_list(value):
+    """Normalize a benchmark field that may be a scalar or a list into a list.
+    """
+    return list(value) if isinstance(value, list) else [value]
+
+
 def parse_param_range(param_def):
     if isinstance(param_def, list):
         return param_def
@@ -84,10 +90,11 @@ class TrainedModel:
 
 
 def load_seed(config_path: str, default: int = 42) -> int:
-    """The single benchmark-wide RNG seed (config.yaml -> benchmark.seed)."""
+    """A single benchmark-wide RNG seed (config.yaml -> benchmark.seed)."""
     with open(config_path) as f:
         raw = yaml.safe_load(f)
-    return (raw.get('benchmark', {}) or {}).get('seed', default)
+    seed = (raw.get('benchmark', {}) or {}).get('seed', default)
+    return as_list(seed)[0]
 
 
 def generate_trained_models(config_path: str, datasets=None) -> list:
