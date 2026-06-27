@@ -24,6 +24,7 @@ class LightShapApproxBackend(BaseBackend):
     name = "lightshap_approx"
     library = "lightshap"
     computation_type = "approximation"
+    SUPPORTED_APPROXIMATORS = ("kernel", "permutation")
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         approximator = self.config.get("approximator", "permutation")

@@ -103,7 +103,7 @@ def generate_trained_models(config_path: str, datasets=None) -> list:
             model_enum = Model(model_key)
         except ValueError:
             continue
-        if model_enum == Model.PYTORCH_NEURAL_NETWORK:
+        if model_enum.is_nn:
             continue
 
         for params in ParameterGrid(param_grid):
