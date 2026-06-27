@@ -1,0 +1,55 @@
+benchmark:
+  # Single source of truth for all randomness (data subsampling, model training,
+  # and any stochastic approximator) — same meaning as configs/config.yaml's
+  # seed, required here too since slurm/run_benchmark.py reads it unconditionally.
+  seed: 42
+  # Shared value function (only "marginal" is supported) — see configs/config.yaml.
+  # Tree backends don't use this directly, but it's still required since
+  # run_benchmark.py reads it unconditionally for every config.
+  imputer: marginal
+  # Reference background set for the imputer; cost scales with this.
+  n_background: 200
+  # Instances explained per (model, dataset) cell; null = explain every row.
+  n_eval: 100
+  # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
+  # ShapTrueValueBackend (the oracle) still always runs regardless.
+  libraries: []
+  approximators: []
+  budgets: []
+  # GPU-focused sweep: woodelf only, comparing its CPU (path_dependent/
+  # interventional) backends against the GPU=True (cupy-backed) equivalents
+  # (gpu_path_dependent/gpu_interventional). The GPU backends are unverified on
+  # real GPU hardware — without a CUDA device + cupy they skip to all-NaN rows
+  # (see WoodelfGPU*Backend in Benchmarking/backends/woodelf_backend.py), so this
+  # config is only useful run on a GPU node (see slurm/bench_array_gpu.sh).
+  tree_libraries: [woodelf]
+  tree_modes: [path_dependent, interventional, gpu_path_dependent, gpu_interventional]
+  # No order-2 interaction sweep here: WoodelfInteractionBackend has no GPU
+  # variant (always GPU=False), so it wouldn't add a cpu/gpu comparison.
+  interaction_libraries: []
+  interaction_max_features: 16
+
+models:
+  xgboost:
+    n_estimators: [100]
+    max_depth: [6]
+    learning_rate: [0.1]
+
+  lightgbm:
+    n_estimators: [100]
+    max_depth: [-1]
+    learning_rate: [0.1]
+
+# Same dataset grid as configs/config-tree.yaml.
+datasets:
+  ames_housing:
+    n_features: [4, 16, 64]
+    n_samples: [1000]
+
+  adult_census:
+    n_features: [4, 7, 14]
+    n_samples: [1000]
+
+  gisette:
+    n_features: [4, 32, 256]
+    n_samples: [1000]

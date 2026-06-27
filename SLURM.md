@@ -95,12 +95,13 @@ print('All datasets cached.')
 sinfo
 ```
 
-For this benchmark (CPU only, no GPU needed) any standard partition works —
-`Krater`, `Gesteine_A`, etc. No application needed; Abaki (GPU nodes) is only
-required if you add GPU workloads.
+For `configs/config.yaml` / `configs/config-tree.yaml` (CPU only) any standard
+partition works — `Krater`, `Gesteine_A`, etc. `configs/config-tree-gpu.yaml`
+needs a GPU node — Abaki — requested via `slurm/bench_array_gpu.sh`'s
+`--gres=gpu:1`.
 
-If the partition name differs from what is set in `slurm/bench_array.sh`, edit
-the `--partition=` line there before submitting.
+If the partition name differs from what is set in `slurm/bench_array.sh` /
+`slurm/bench_array_gpu.sh`, edit the `--partition=` line there before submitting.
 
 ---
 
@@ -108,12 +109,15 @@ the `--partition=` line there before submitting.
 
 ```bash
 cd ~/PR_ModeAgnostic
-bash slurm/submit.sh                       # model-agnostic sweep (configs/config.yaml)
-bash slurm/submit.sh configs/config-tree.yaml  # tree-specific sweep
+bash slurm/submit.sh                            # model-agnostic sweep (configs/config.yaml)
+bash slurm/submit.sh configs/config-tree.yaml      # tree-specific sweep
+bash slurm/submit.sh configs/config-tree-gpu.yaml  # woodelf cpu-vs-gpu sweep (needs a GPU node)
 ```
 
-Run either or both — each gets its own output directory and merged CSV, so
-they never collide. This script:
+Run any subset — each gets its own output directory and merged CSV, so they
+never collide. `submit.sh` picks the array script automatically:
+`slurm/bench_array_gpu.sh` (requests `--gres=gpu:1` on Abaki) for any config
+whose name contains "gpu", otherwise `slurm/bench_array.sh`. This script:
 1. Counts the `(dataset × model)` combinations from the given config.
 2. Submits a SLURM **array job** — one task per combination, each writing to its
    own CSV under `Benchmarking/slurm_results/<config_name>/` so there are no
@@ -142,7 +146,7 @@ scancel -u $USER
 
 After the merge job finishes, copy the merged CSV(s) back to your Mac
 (`results_config.csv` for the model-agnostic run, `results_config-tree.csv`
-for the tree run):
+for the tree run, `results_config-tree-gpu.csv` for the woodelf cpu-vs-gpu run):
 
 ```bash
 # Run this on your Mac
@@ -163,8 +167,11 @@ rsync -avz <cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/Benchmarking/ \
 
 ```
 slurm/
-├── submit.sh           ← entry point: run this to submit everything
-├── bench_array.sh      ← SLURM array job definition; takes (config, output_dir) args
+├── submit.sh           ← entry point: run this to submit everything (picks the
+│                          array script below based on the config name)
+├── bench_array.sh      ← SLURM array job definition (CPU); takes (config, output_dir) args
+├── bench_array_gpu.sh  ← GPU counterpart (--gres=gpu:1, Abaki); used for any
+│                          config whose name contains "gpu"
 ├── merge.sh            ← SLURM merge job (auto-triggered after array)
 ├── run_benchmark.py    ← worker: runs one (dataset, model) cell, both first-order
 │                          and (for tree models) the order-2 interaction sweep
@@ -173,19 +180,23 @@ slurm/
 └── logs/               ← per-task stdout/stderr (gitignored)
 
 configs/
-├── config.yaml          ← model-agnostic sweep (libraries, approximators, models)
-└── config-tree.yaml     ← tree-specific sweep (tree backends, interactions)
+├── config.yaml           ← model-agnostic sweep (libraries, approximators, models)
+├── config-tree.yaml      ← tree-specific sweep (tree backends, interactions)
+└── config-tree-gpu.yaml  ← woodelf cpu-vs-gpu sweep (path_dependent/interventional,
+                             each in a CPU and a GPU=True variant)
 
 Benchmarking/
 ├── runner.py            ← BenchmarkRunner — runs one oracle + backends/approximations per cell
 ├── metrics.py            ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
 ├── backends/             ← one class per (library, mode); tree_*.py / woodelf_backend.py /
 │                            fasttreeshap_backend.py / gputreeshap_backend.py are tree-specific
-├── results_config.csv       ← merged model-agnostic results (after step 5/7)
-├── results_config-tree.csv  ← merged tree results (after step 5/7)
+├── results_config.csv         ← merged model-agnostic results (after step 5/7)
+├── results_config-tree.csv    ← merged tree results (after step 5/7)
+├── results_config-tree-gpu.csv ← merged woodelf cpu-vs-gpu results (after step 5/7)
 └── slurm_results/
-    ├── config/         ← model-agnostic run's per-task CSVs (gitignored)
-    └── config-tree/    ← tree run's per-task CSVs (gitignored)
+    ├── config/             ← model-agnostic run's per-task CSVs (gitignored)
+    ├── config-tree/        ← tree run's per-task CSVs (gitignored)
+    └── config-tree-gpu/    ← gpu run's per-task CSVs (gitignored)
 
 Models/
 ├── dataset_and_models.py ← Dataset/Model enums; Model.is_tree gates the tree-specific sweep
