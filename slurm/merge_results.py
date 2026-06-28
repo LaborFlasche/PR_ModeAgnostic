@@ -27,10 +27,11 @@ def main():
 
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
 
-    dedup_cols = ["dataset", "model", "n_features", "n_samples", "backend", "approximator", "budget"]
-    if "n_background" in df.columns:
-        dedup_cols.append("n_background")
-    df = df.drop_duplicates(subset=dedup_cols, keep="last")
+    df = df.drop_duplicates(
+        subset=["dataset", "model", "n_features", "n_samples", "seed", "n_background",
+                "backend", "approximator", "budget"],
+        keep="last",
+    )
 
     df.to_csv(args.output_csv, index=False)
     print(f"Merged {len(files)} files -> {len(df)} rows -> {args.output_csv}")

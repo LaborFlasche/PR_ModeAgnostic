@@ -7,7 +7,7 @@ benchmark:
   seed: 42
   # Number of rows used as the imputer background / reference set (defines the
   # marginal value function). Cost per explanation scales with this;
-  n_background: 32
+  n_background: [32]
   # Number of instances actually explained and averaged per (model, dataset) cell.
   # The main runtime lever. The averaged accuracy metrics stabilise after a few
   # hundred points, so a small value keeps representativeness while cutting runtime
