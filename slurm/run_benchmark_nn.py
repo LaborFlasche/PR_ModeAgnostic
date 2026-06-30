@@ -21,10 +21,9 @@ warnings.filterwarnings("ignore", message="The sample size is larger.*", categor
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
 import yaml
-from sklearn.model_selection import ParameterGrid
 
-from Models.config_parser import load_config, load_dataset_config
 from Models.dataset_and_models import Dataset, Model
+from task_grid import build_all_runs_nn as build_all_runs
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
     ShapIQTrueValueBackend,
@@ -44,24 +43,6 @@ APPROX_MAP = {
 NN_TRUE_VALUE_MAP = {
     "shapiq": ShapIQTrueValueBackend,
 }
-
-
-def build_all_runs(config_path: str) -> list[tuple]:
-    model_config = load_config(config_path)
-    dataset_config = load_dataset_config(config_path)
-    with open(config_path) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
-    dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
-    n_backgrounds = bench["n_background"]
-    if isinstance(n_backgrounds, int):
-        n_backgrounds = [n_backgrounds]
-    return [
-        (dk, dp, mk, mp, n_bg)
-        for dk, dp in dataset_runs
-        for mk, mp in model_runs
-        for n_bg in n_backgrounds
-    ]
 
 
 def main():

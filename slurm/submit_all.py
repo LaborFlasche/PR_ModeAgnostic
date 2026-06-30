@@ -24,8 +24,7 @@ from collections import defaultdict
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-from sklearn.model_selection import ParameterGrid
-from Models.config_parser import load_config, load_dataset_config
+from task_grid import build_all_runs, build_all_runs_nn
 
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls
@@ -54,10 +53,12 @@ CONFIG_REGISTRY = {
 # Task counting
 # ---------------------------------------------------------------------------
 
-def count_tasks(config_path: str) -> int:
-    model_runs = [p for pg in load_config(config_path).values() for p in ParameterGrid(pg)]
-    dataset_runs = [p for pg in load_dataset_config(config_path).values() for p in ParameterGrid(pg)]
-    return len(model_runs) * len(dataset_runs)
+def count_tasks(config_key: str) -> int:
+    """Number of SLURM array tasks for a config — must match the length of
+    whatever build_all_runs[_nn] the worker script indexes --task-id into."""
+    spec = CONFIG_REGISTRY[config_key]
+    build_fn = build_all_runs_nn if spec["worker"].endswith("run_benchmark_nn.py") else build_all_runs
+    return len(build_fn(spec["config"]))
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +161,7 @@ def run(selected: list[str]) -> None:
     print("Config task counts:")
     for key in selected:
         cfg = CONFIG_REGISTRY[key]["config"]
-        n = count_tasks(cfg)
+        n = count_tasks(key)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
         for task_id in range(n):
             pending.append((key, task_id))
