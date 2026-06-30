@@ -49,12 +49,18 @@ NN_TRUE_VALUE_MAP = {
 def build_all_runs(config_path: str) -> list[tuple]:
     model_config = load_config(config_path)
     dataset_config = load_dataset_config(config_path)
+    with open(config_path) as f:
+        bench = yaml.safe_load(f)["benchmark"]
     model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
     dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
+    n_backgrounds = bench["n_background"]
+    if isinstance(n_backgrounds, int):
+        n_backgrounds = [n_backgrounds]
     return [
-        (dk, dp, mk, mp)
+        (dk, dp, mk, mp, n_bg)
         for dk, dp in dataset_runs
         for mk, mp in model_runs
+        for n_bg in n_backgrounds
     ]
 
 
@@ -71,8 +77,8 @@ def main():
         print(f"task-id {args.task_id} out of range (max {len(all_runs) - 1})", file=sys.stderr)
         sys.exit(1)
 
-    dk, dp, mk, mp = all_runs[args.task_id]
-    print(f"[task {args.task_id}] dataset={dk} {dp} | model={mk} {mp}")
+    dk, dp, mk, mp, n_background = all_runs[args.task_id]
+    print(f"[task {args.task_id}] dataset={dk} {dp} | model={mk} {mp} | n_background={n_background}")
 
     with open(args.config) as f:
         bench = yaml.safe_load(f)["benchmark"]
@@ -101,26 +107,25 @@ def main():
         if cls is not None:
             true_value_backends.append(cls)
 
-    runner = BenchmarkRunner(
-        true_value_backends=true_value_backends,
-        approximation_specs=approx_specs,
-        output_csv=output_csv,
-        n_background=bench["n_background"],
-        n_eval=bench["n_eval"],
-        seed=seed,
-        imputer=imputer,
-    )
-
     dataset_enum = Dataset[dk.upper()]
     ds = dataset_enum.load_dataset(**dp, seed=seed)
     device = bench.get("device", "cpu")
     trainer = model_enum.get_model_with_params(dataset_enum, {**mp, "device": device}, seed=seed)
     trainer.fit(ds["X"], ds["y"], task=ds["task"])
 
+    runner = BenchmarkRunner(
+        true_value_backends=true_value_backends,
+        approximation_specs=approx_specs,
+        output_csv=output_csv,
+        n_background=n_background,
+        n_eval=bench["n_eval"],
+        seed=seed,
+        imputer=imputer,
+    )
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, "order": 1, **dp},
+        run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": n_background, **dp},
     )
 
     print(f"[task {args.task_id}] done -> {output_csv}")

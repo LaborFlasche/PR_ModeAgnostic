@@ -148,6 +148,11 @@ def main():
                 if cls is not None:
                     true_value_backends.append(cls)
 
+    dataset_enum = Dataset[dk.upper()]
+    ds = dataset_enum.load_dataset(**dp, seed=seed)
+    trainer = model_enum.get_model_with_params(dataset_enum, mp, seed=seed)
+    trainer.fit(ds["X"], ds["y"], task=ds["task"])
+
     runner = BenchmarkRunner(
         true_value_backends=true_value_backends,
         approximation_specs=approx_specs,
@@ -157,12 +162,6 @@ def main():
         seed=seed,
         imputer=imputer,
     )
-
-    dataset_enum = Dataset[dk.upper()]
-    ds = dataset_enum.load_dataset(**dp, seed=seed)
-    trainer = model_enum.get_model_with_params(dataset_enum, mp, seed=seed)
-    trainer.fit(ds["X"], ds["y"], task=ds["task"])
-
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],

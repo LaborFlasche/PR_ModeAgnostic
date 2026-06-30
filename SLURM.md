@@ -1,8 +1,15 @@
 # Running the benchmark on the IFI SLURM cluster
 
-The `(dataset × model)` benchmark cells (36 model-agnostic, 18 tree-specific —
-see step 5) are fully independent and take hours sequentially. In parallel on
-SLURM they finish in ~15–20 min.
+Four Research Questions, four configs, **75 independent tasks** in total.
+The queue manager (`slurm/submit_all.py`) submits all of them while staying
+within the Krater partition limit of **30 jobs** (15 running + 15 pending).
+
+| Config key | File | Tasks | RQ |
+|------------|------|-------|----|
+| `accuracy` | `configs/config-accuracy.yaml` | 12 | Approximation accuracy vs. background size |
+| `dimensionality` | `configs/config-dimensionality.yaml` | 36 | Scalability with feature count |
+| `tree` | `configs/config-tree.yaml` | 18 | Tree-native backends vs. model-agnostic |
+| `nn` | `configs/config-neural-networks-RQ3.yaml` | 9 | Gradient-based backends for neural networks |
 
 ---
 
@@ -66,25 +73,43 @@ uv sync
 
 ## 3. Pre-download datasets (do this once on the login node)
 
-Compute nodes may have no outbound internet access. Cache all datasets first:
+Compute nodes may have no outbound internet access. Cache all datasets first.
+Run once per unique `(dataset, n_features, n_samples)` combination across all
+four configs:
 
 ```bash
 cd ~/PR_ModeAgnostic
-uv run python -c "
-import yaml
+uv run python - <<'EOF'
+import yaml, itertools
 from Models.dataset_and_models import Dataset
 
-with open('configs/config.yaml') as f:
-    cfg = yaml.safe_load(f)
-
-seed = cfg['benchmark']['seed']
-for ds_key, params in cfg['datasets'].items():
-    for nf in params.get('n_features', [4]):
-        for ns in params.get('n_samples', [1000]):
-            print(f'Fetching {ds_key} nf={nf} ns={ns} ...')
-            Dataset[ds_key.upper()].load_dataset(n_features=nf, n_samples=ns, seed=seed)
-print('All datasets cached.')
-"
+configs = [
+    "configs/config-accuracy.yaml",
+    "configs/config-dimensionality.yaml",
+    "configs/config-tree.yaml",
+    "configs/config-neural-networks-RQ3.yaml",
+]
+seen = set()
+for cfg_path in configs:
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f)
+    seed = cfg["benchmark"]["seed"]
+    for ds_key, params in cfg["datasets"].items():
+        for nf in params.get("n_features", [None]):
+            for ns in params.get("n_samples", [None]):
+                key = (ds_key, nf, ns)
+                if key in seen:
+                    continue
+                seen.add(key)
+                print(f"Fetching {ds_key} nf={nf} ns={ns} ...")
+                kw = {}
+                if nf is not None:
+                    kw["n_features"] = nf
+                if ns is not None:
+                    kw["n_samples"] = ns
+                Dataset[ds_key.upper()].load_dataset(**kw, seed=seed)
+print(f"Done — {len(seen)} unique (dataset, n_features, n_samples) combinations cached.")
+EOF
 ```
 
 ---
@@ -102,13 +127,75 @@ needs a GPU node — Abaki — requested via `slurm/bench_array_gpu.sh`'s
 
 If the partition name differs from what is set in `slurm/bench_array.sh` /
 `slurm/bench_array_gpu.sh`, edit the `--partition=` line there before submitting.
+The benchmark scripts target the `Krater` partition. If the partition name
+differs on your allocation, edit the `--partition=` line in
+`slurm/bench_array.sh`, `slurm/bench_array_nn.sh`, and `slurm/single_task.sh`
+before submitting.
+
+> **Note on GPU for NN jobs:** `config-neural-networks-RQ3.yaml` sets
+> `device: cuda`. If Krater does not auto-assign a GPU, add `--gres=gpu:1` to
+> the `sbatch` call inside `submit_all.py` for `nn` config entries (look for the
+> comment in `slurm/single_task.sh`).
 
 ---
 
 ## 5. Submit
 
+### Run all four Research Questions at once (recommended)
+
+Open a **tmux or screen session** first — the queue manager is a long-running
+process that must stay alive until all 75 tasks finish:
+
 ```bash
+tmux new -s bench       # or: screen -S bench
 cd ~/PR_ModeAgnostic
+uv run python slurm/submit_all.py --configs all
+```
+
+The script prints a task summary, then enters a poll loop:
+
+```
+Config task counts:
+  accuracy         12 tasks  (configs/config-accuracy.yaml)
+  dimensionality   36 tasks  (configs/config-dimensionality.yaml)
+  tree             18 tasks  (configs/config-tree.yaml)
+  nn                9 tasks  (configs/config-neural-networks-RQ3.yaml)
+
+Total: 75 tasks | MAX_JOBS=30 | poll every 60s
+```
+
+It submits up to 30 jobs, then wakes every 60 seconds, detects completions via
+`squeue`, and tops up the queue. When all 75 tasks are done it submits one merge
+job per config automatically.
+
+### Run a subset of configs
+
+```bash
+# Only accuracy and dimensionality
+uv run python slurm/submit_all.py --configs accuracy dimensionality
+
+# Only tree
+uv run python slurm/submit_all.py --configs tree
+
+# Only neural networks
+uv run python slurm/submit_all.py --configs nn
+```
+
+### Submit a single config (legacy, no queue management)
+
+Use `submit.sh` when you only need one config and don't need queue throttling —
+it submits the full SLURM array in one shot:
+
+```bash
+bash slurm/submit.sh configs/config-accuracy.yaml
+bash slurm/submit.sh configs/config-dimensionality.yaml
+bash slurm/submit.sh configs/config-tree.yaml
+bash slurm/submit.sh configs/config-neural-networks-RQ3.yaml
+```
+
+> **Warning:** `submit.sh` submits all tasks at once with no concurrency limit.
+> If the task count exceeds 30, SLURM may reject the submission. Use
+> `submit_all.py` when in doubt.
 bash slurm/submit.sh                            # model-agnostic sweep (configs/config.yaml)
 bash slurm/submit.sh configs/config-tree.yaml      # tree-specific sweep
 bash slurm/submit.sh configs/config-tree-gpu.yaml  # woodelf cpu-vs-gpu sweep (needs a GPU node)
@@ -130,8 +217,13 @@ whose name contains "gpu", otherwise `slurm/bench_array.sh`. This script:
 ## 6. Monitor
 
 ```bash
-squeue -u $USER                              # all your running/pending jobs
-tail -f slurm/logs/bench_<JOBID>_<N>.out    # live output for task N
+squeue -u $USER                           # all your running/pending jobs
+
+# Live output for a task submitted via submit_all.py
+tail -f slurm/logs/task_<JOBID>.out
+
+# Live output for a task submitted via submit.sh (array jobs)
+tail -f slurm/logs/bench_<ARRAYJOBID>_<TASKID>.out
 ```
 
 Cancel everything if needed:
@@ -147,19 +239,29 @@ scancel -u $USER
 After the merge job finishes, copy the merged CSV(s) back to your Mac
 (`results_config.csv` for the model-agnostic run, `results_config-tree.csv`
 for the tree run, `results_config-tree-gpu.csv` for the woodelf cpu-vs-gpu run):
+After all merge jobs finish, copy the four result CSVs back to your Mac:
 
 ```bash
 # Run this on your Mac
-scp '<cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/Benchmarking/results_*.csv' \
+scp '<cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/Benchmarking/results_config-*.csv' \
     Benchmarking/
 ```
 
-Or if you prefer rsync:
+Or with rsync:
 
 ```bash
 rsync -avz <cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/Benchmarking/ \
     Benchmarking/ --include='results_*.csv' --exclude='*'
 ```
+
+The four merged files produced are:
+
+| File | Config |
+|------|--------|
+| `Benchmarking/results_config-accuracy.csv` | accuracy |
+| `Benchmarking/results_config-dimensionality.csv` | dimensionality |
+| `Benchmarking/results_config-tree.csv` | tree |
+| `Benchmarking/results_config-neural-networks-RQ3.csv` | nn |
 
 ---
 
@@ -167,6 +269,15 @@ rsync -avz <cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/Benchmarking/ \
 
 ```
 slurm/
+├── submit_all.py       ← main entry point: queue manager for all 4 configs
+├── submit.sh           ← legacy single-config submitter (no queue throttling)
+├── single_task.sh      ← generic sbatch wrapper used by submit_all.py
+├── bench_array.sh      ← SLURM array script for model-agnostic / tree configs
+├── bench_array_nn.sh   ← SLURM array script for NN config
+├── merge.sh            ← SLURM merge job (auto-triggered after all tasks)
+├── run_benchmark.py    ← worker: one (dataset, model) cell, first-order +
+│                          order-2 tree interactions; sweeps n_background if list
+├── run_benchmark_nn.py ← worker: NN-specific gradient-based + model-agnostic backends
 ├── submit.sh           ← entry point: run this to submit everything (picks the
 │                          array script below based on the config name)
 ├── bench_array.sh      ← SLURM array job definition (CPU); takes (config, output_dir) args
@@ -180,12 +291,23 @@ slurm/
 └── logs/               ← per-task stdout/stderr (gitignored)
 
 configs/
+├── config-accuracy.yaml            ← RQ: accuracy vs. background size (12 tasks)
+├── config-dimensionality.yaml      ← RQ: scalability with feature count (36 tasks)
+├── config-tree.yaml                ← RQ: tree-native backends (18 tasks)
+└── config-neural-networks-RQ3.yaml ← RQ: gradient-based NN backends (9 tasks)
 ├── config.yaml           ← model-agnostic sweep (libraries, approximators, models)
 ├── config-tree.yaml      ← tree-specific sweep (tree backends, interactions)
 └── config-tree-gpu.yaml  ← woodelf cpu-vs-gpu sweep (path_dependent/interventional,
                              each in a CPU and a GPU=True variant)
 
 Benchmarking/
+├── runner.py            ← BenchmarkRunner — oracle + approximators per cell
+├── metrics.py           ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
+├── backends/            ← one class per (library, mode)
+├── results_config-accuracy.csv           ← merged after step 5/7
+├── results_config-dimensionality.csv     ← merged after step 5/7
+├── results_config-tree.csv               ← merged after step 5/7
+├── results_config-neural-networks-RQ3.csv ← merged after step 5/7
 ├── runner.py            ← BenchmarkRunner — runs one oracle + backends/approximations per cell
 ├── metrics.py            ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
 ├── backends/             ← one class per (library, mode); tree_*.py / woodelf_backend.py /
@@ -194,6 +316,10 @@ Benchmarking/
 ├── results_config-tree.csv    ← merged tree results (after step 5/7)
 ├── results_config-tree-gpu.csv ← merged woodelf cpu-vs-gpu results (after step 5/7)
 └── slurm_results/
+    ├── config-accuracy/          ← per-task CSVs (gitignored)
+    ├── config-dimensionality/    ← per-task CSVs (gitignored)
+    ├── config-tree/              ← per-task CSVs (gitignored)
+    └── config-neural-networks-RQ3/ ← per-task CSVs (gitignored)
     ├── config/             ← model-agnostic run's per-task CSVs (gitignored)
     ├── config-tree/        ← tree run's per-task CSVs (gitignored)
     └── config-tree-gpu/    ← gpu run's per-task CSVs (gitignored)
@@ -217,32 +343,51 @@ uv.lock                   ← locked dependency versions (synced in step 2)
 
 ---
 
-## Updating the config
+## Updating a config
 
-If you add more models, datasets, or budgets, the task count changes
-automatically — `submit.sh` always recomputes it from the config. No need to
-update any hardcoded number. This applies to both `configs/config.yaml` and
-`configs/config-tree.yaml`.
+If you add models, datasets, or budgets, the task count updates automatically —
+`submit_all.py` and `submit.sh` always recompute it from the config. No hardcoded
+numbers need updating.
 
 ---
 
 ## If a task fails
 
-Check its log:
+Find its log. For `submit_all.py` jobs, logs are named by SLURM job ID:
 
 ```bash
-cat slurm/logs/bench_<JOBID>_<TASKID>.out
+cat slurm/logs/task_<JOBID>.out
 ```
 
-Re-run just that task manually to debug (add `--config configs/config-tree.yaml`
-if it's a tree-run task):
+For `submit.sh` array jobs:
 
 ```bash
-uv run python slurm/run_benchmark.py --task-id <TASKID>
+cat slurm/logs/bench_<ARRAYJOBID>_<TASKID>.out
+```
+
+Re-run just that task manually to debug:
+
+```bash
+# Model-agnostic / tree / accuracy / dimensionality configs
+uv run python slurm/run_benchmark.py \
+    --task-id <TASKID> \
+    --config configs/config-accuracy.yaml \
+    --output-dir Benchmarking/slurm_results/config-accuracy
+
+# NN config
+uv run python slurm/run_benchmark_nn.py \
+    --task-id <TASKID> \
+    --config configs/config-neural-networks-RQ3.yaml \
+    --output-dir Benchmarking/slurm_results/config-neural-networks-RQ3
 ```
 
 When all tasks are done (including any reruns), merge manually:
 
 ```bash
-uv run python slurm/merge_results.py --input-dir Benchmarking/slurm_results/config --output-csv Benchmarking/results_config.csv
+uv run python slurm/merge_results.py \
+    --input-dir Benchmarking/slurm_results/config-accuracy \
+    --output-csv Benchmarking/results_config-accuracy.csv
 ```
+
+Replace `config-accuracy` / `results_config-accuracy` with the relevant config
+name for the other three RQs.
