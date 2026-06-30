@@ -27,6 +27,7 @@ dependencies = [
     "woodelf-explainer>=0.4.3",
     "xgboost>=2.0.0",
     "dalex>=1.7.2",
+    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]

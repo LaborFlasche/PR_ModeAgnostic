@@ -55,6 +55,8 @@ class ShapIQApproxBackend(BaseBackend):
     library = "shapiq"
     computation_type = "approximation"
 
+    SUPPORTED_APPROXIMATORS = ("kernel", "permutation")
+
     _APPROXIMATORS = {
         "kernel": shapiq.approximator.KernelSHAP,
         "permutation": shapiq.approximator.PermutationSamplingSV,

@@ -43,6 +43,7 @@ class ShapApproxBackend(BaseBackend):
     name = "shap_approx"
     library = "shap"
     computation_type = "approximation"
+    SUPPORTED_APPROXIMATORS = ("kernel", "permutation")
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         approximator = self.config.get("approximator", "permutation")
