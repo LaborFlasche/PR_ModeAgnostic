@@ -105,7 +105,7 @@ Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchma
 
 `shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `Benchmarking/backends/tree_shapiq_backend.py`).
 
-GPU-backed variants (`woodelf` with `GPU=True`, and XGBoost's native GPU SHAP path under the name `gputreeshap`) exist in `Benchmarking/backends/` for future use but aren't currently wired into `configs/config-tree.yaml` or `slurm/run_benchmark.py` — no GPU hardware has been available to verify them yet.
+GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows. XGBoost's native GPU SHAP path under the name `gputreeshap` exists in `Benchmarking/backends/` for future use but isn't wired into any config yet.
 
 `configs/config-tree.yaml`'s `tree_libraries`/`tree_modes`/`interaction_libraries` control which of the above run; `interaction_max_features` caps interaction sweeps since their output is quadratic in feature count.
 

@@ -40,11 +40,14 @@ from Benchmarking.backends import (
     ShapIQInteractionBackend,
     WoodelfTreePathDependentBackend,
     WoodelfTreeInterventionalBackend,
+    WoodelfGPUPathDependentBackend,
+    WoodelfGPUInterventionalBackend,
     WoodelfInteractionBackend,
     FastTreeShapBackend,
 )
-# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in Benchmarking.backends for
-# future use but aren't wired in here for now.
+# GPUTreeShapBackend/GPUTreeShapInteractionBackend exist in Benchmarking.backends
+# for future use but aren't wired in here yet (XGBoost-only, unverified on real
+# GPU hardware) — only woodelf's GPU=True path is wired below.
 
 APPROX_MAP = {
     "shap": ShapApproxBackend,
@@ -56,11 +59,15 @@ APPROX_MAP = {
 # Tree-specific true-value backends, only applied to tree models (Model.is_tree).
 # Keyed by (library, mode). No ("shapiq_tree", "interventional") entry: it
 # crashes in this dependency stack — see tree_shapiq_backend.py.
+# "gpu_path_dependent"/"gpu_interventional" run woodelf's GPU=True (cupy-backed)
+# path — unverified on real GPU hardware, skips to all-NaN without a CUDA device.
 TREE_TRUE_VALUE_MAP = {
     ("shap_tree", "path_dependent"): ShapTreePathDependentBackend,
     ("shapiq_tree", "path_dependent"): ShapIQTreePathDependentBackend,
     ("woodelf", "path_dependent"): WoodelfTreePathDependentBackend,
     ("woodelf", "interventional"): WoodelfTreeInterventionalBackend,
+    ("woodelf", "gpu_path_dependent"): WoodelfGPUPathDependentBackend,
+    ("woodelf", "gpu_interventional"): WoodelfGPUInterventionalBackend,
     ("fasttreeshap", "path_dependent"): FastTreeShapBackend,
 }
 
