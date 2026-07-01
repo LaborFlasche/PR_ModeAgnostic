@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=shap_bench_gpu
-#SBATCH --partition=Abaki
+#SBATCH --partition=NvidiaAll
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=2
 #SBATCH --time=12:00:00
@@ -8,7 +8,7 @@
 #SBATCH --error=slurm/logs/bench_%A_%a.err
 # GPU counterpart of bench_array.sh — used for configs/config-tree-gpu.yaml
 # (and any other config whose name contains "gpu", see submit.sh). Requests one
-# GPU on the Abaki partition; everything else mirrors bench_array.sh.
+# GPU on the NvidiaAll partition; everything else mirrors bench_array.sh.
 # --array is set dynamically by submit.sh — do not set it here
 # $1 = config path, $2 = output dir — both passed through by submit.sh.
 

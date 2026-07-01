@@ -10,7 +10,7 @@ benchmark:
   # Reference background set for the imputer; cost scales with this.
   n_background: 200
   # Instances explained per (model, dataset) cell; null = explain every row.
-  n_eval: 100
+  n_eval: 10
   # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
   # ShapTrueValueBackend (the oracle) still always runs regardless.
   libraries: []
