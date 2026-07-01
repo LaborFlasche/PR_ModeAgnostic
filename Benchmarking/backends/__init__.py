@@ -1,5 +1,5 @@
 from .shap_backend import ShapTrueValueBackend, ShapApproxBackend
-from .shapiq_backend import ShapIQTrueValueBackend, ShapIQApproxBackend
+from .shapiq_backend import ShapIQTrueValueBackend, ShapIQApproxBackend, ShapIQProxyBackend
 from .lightshap_backend import LightShapApproxBackend
 from .dalex_backend import DalexApproxBackend
 from .tree_shap_backend import ShapTreePathDependentBackend, ShapInteractionBackend
@@ -25,6 +25,7 @@ __all__ = [
     "ShapApproxBackend",
     "ShapIQTrueValueBackend",
     "ShapIQApproxBackend",
+    "ShapIQProxyBackend",
     "LightShapApproxBackend",
     "DalexApproxBackend",
     "ShapTreePathDependentBackend",

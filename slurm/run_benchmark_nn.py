@@ -28,6 +28,7 @@ from Models.dataset_and_models import Dataset, Model
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
     ShapIQTrueValueBackend,
+    ShapIQProxyBackend,
     CaptumApproxBackend,
     ShapNNApproxBackend,
     LightShapApproxBackend,
@@ -39,11 +40,31 @@ APPROX_MAP = {
     "shap_nn": ShapNNApproxBackend,
     "lightshap": LightShapApproxBackend,
     "dalex": DalexApproxBackend,
+    "shapiq_proxy": ShapIQProxyBackend,
 }
 
 NN_TRUE_VALUE_MAP = {
     "shapiq": ShapIQTrueValueBackend,
 }
+
+
+def build_approx_specs(bench: dict) -> list[tuple]:
+    """(backend class, config) per library × approximator × budget, filtered by
+    each backend's SUPPORTED_APPROXIMATORS. An optional top-level `proxy_model`
+    key ("xgboost"/"lightgbm"/"tree"/"linear") is forwarded to ProxySHAP specs
+    only — see ShapIQProxyBackend for why non-default proxies matter locally."""
+    proxy_model = bench.get("proxy_model")
+    return [
+        (
+            APPROX_MAP[lib],
+            {"approximator": appr, "budget": bgt}
+            | ({"proxy_model": proxy_model} if proxy_model and appr == "proxy" else {}),
+        )
+        for lib in bench["libraries"]
+        for appr in bench["approximators"]
+        for bgt in bench["budgets"]
+        if appr in getattr(APPROX_MAP[lib], "SUPPORTED_APPROXIMATORS", bench["approximators"])
+    ]
 
 
 def build_all_runs(config_path: str) -> list[tuple]:
@@ -86,13 +107,7 @@ def main():
     seed = bench["seed"]
     imputer = bench["imputer"]
 
-    approx_specs = [
-        (APPROX_MAP[lib], {"approximator": appr, "budget": bgt})
-        for lib in bench["libraries"]
-        for appr in bench["approximators"]
-        for bgt in bench["budgets"]
-        if appr in getattr(APPROX_MAP[lib], "SUPPORTED_APPROXIMATORS", bench["approximators"])
-    ]
+    approx_specs = build_approx_specs(bench)
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_csv = os.path.join(args.output_dir, f"results_{args.task_id:04d}.csv")
