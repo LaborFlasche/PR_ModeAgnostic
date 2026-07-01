@@ -4,9 +4,8 @@ benchmark:
   # seed, required here too since slurm/run_benchmark.py reads it unconditionally.
   seed: 42
   # Shared value function (only "marginal" is supported) — see configs/config.yaml.
-  # Tree backends don't use this directly (they use their own
-  # path-dependent/interventional distinction via tree_modes below), but it's
-  # still required since run_benchmark.py reads it unconditionally for every config.
+  # Tree backends don't use this directly, but it's still required since
+  # run_benchmark.py reads it unconditionally for every config.
   imputer: marginal
   # Reference background set for the imputer; cost scales with this.
   n_background: 200
@@ -17,17 +16,17 @@ benchmark:
   libraries: []
   approximators: []
   budgets: []
-  # Tree-specific true-value backends, only run for tree models. No GPU
-  # libraries plugged in for now (woodelf_gpu/gputreeshap backends still exist
-  # in code for future use — see their docstrings). shapiq_tree only ever runs
-  # path-dependent: its interventional mode crashes (see
-  # ShapIQTreeInterventionalBackend's docstring); woodelf covers interventional.
-  tree_libraries: [shap_tree, shapiq_tree, woodelf, fasttreeshap]
-  tree_modes: [path_dependent, interventional]
-  # Pairwise (order-2) interactions, path-dependent only. "shap_tree" is
-  # implicit/always-on (the oracle). interaction_max_features caps d**2 output
-  # columns (quadratic — raise with care).
-  interaction_libraries: [shapiq_tree, woodelf]
+  # GPU-focused sweep: woodelf only, comparing its CPU (path_dependent/
+  # interventional) backends against the GPU=True (cupy-backed) equivalents
+  # (gpu_path_dependent/gpu_interventional). The GPU backends are unverified on
+  # real GPU hardware — without a CUDA device + cupy they skip to all-NaN rows
+  # (see WoodelfGPU*Backend in Benchmarking/backends/woodelf_backend.py), so this
+  # config is only useful run on a GPU node (see slurm/bench_array_gpu.sh).
+  tree_libraries: [woodelf]
+  tree_modes: [path_dependent, interventional, gpu_path_dependent, gpu_interventional]
+  # No order-2 interaction sweep here: WoodelfInteractionBackend has no GPU
+  # variant (always GPU=False), so it wouldn't add a cpu/gpu comparison.
+  interaction_libraries: []
   interaction_max_features: 16
 
 models:
@@ -41,7 +40,7 @@ models:
     max_depth: [-1]
     learning_rate: [0.1]
 
-# Same dataset grid as configs/config.yaml.
+# Same dataset grid as configs/config-tree.yaml.
 datasets:
   ames_housing:
     n_features: [4, 16, 64]

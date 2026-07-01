@@ -120,6 +120,13 @@ EOF
 sinfo
 ```
 
+For `configs/config.yaml` / `configs/config-tree.yaml` (CPU only) any standard
+partition works — `Krater`, `Gesteine_A`, etc. `configs/config-tree-gpu.yaml`
+needs a GPU node — Abaki — requested via `slurm/bench_array_gpu.sh`'s
+`--gres=gpu:1`.
+
+If the partition name differs from what is set in `slurm/bench_array.sh` /
+`slurm/bench_array_gpu.sh`, edit the `--partition=` line there before submitting.
 The benchmark scripts target the `Krater` partition. If the partition name
 differs on your allocation, edit the `--partition=` line in
 `slurm/bench_array.sh`, `slurm/bench_array_nn.sh`, and `slurm/single_task.sh`
@@ -189,6 +196,21 @@ bash slurm/submit.sh configs/config-neural-networks-RQ3.yaml
 > **Warning:** `submit.sh` submits all tasks at once with no concurrency limit.
 > If the task count exceeds 30, SLURM may reject the submission. Use
 > `submit_all.py` when in doubt.
+bash slurm/submit.sh                            # model-agnostic sweep (configs/config.yaml)
+bash slurm/submit.sh configs/config-tree.yaml      # tree-specific sweep
+bash slurm/submit.sh configs/config-tree-gpu.yaml  # woodelf cpu-vs-gpu sweep (needs a GPU node)
+```
+
+Run any subset — each gets its own output directory and merged CSV, so they
+never collide. `submit.sh` picks the array script automatically:
+`slurm/bench_array_gpu.sh` (requests `--gres=gpu:1` on Abaki) for any config
+whose name contains "gpu", otherwise `slurm/bench_array.sh`. This script:
+1. Counts the `(dataset × model)` combinations from the given config.
+2. Submits a SLURM **array job** — one task per combination, each writing to its
+   own CSV under `Benchmarking/slurm_results/<config_name>/` so there are no
+   race conditions.
+3. Submits a **merge job** that runs automatically after all array tasks succeed,
+   combining results into `Benchmarking/results_<config_name>.csv`.
 
 ---
 
@@ -214,6 +236,9 @@ scancel -u $USER
 
 ## 7. Retrieve results
 
+After the merge job finishes, copy the merged CSV(s) back to your Mac
+(`results_config.csv` for the model-agnostic run, `results_config-tree.csv`
+for the tree run, `results_config-tree-gpu.csv` for the woodelf cpu-vs-gpu run):
 After all merge jobs finish, copy the four result CSVs back to your Mac:
 
 ```bash
@@ -253,6 +278,14 @@ slurm/
 ├── run_benchmark.py    ← worker: one (dataset, model) cell, first-order +
 │                          order-2 tree interactions; sweeps n_background if list
 ├── run_benchmark_nn.py ← worker: NN-specific gradient-based + model-agnostic backends
+├── submit.sh           ← entry point: run this to submit everything (picks the
+│                          array script below based on the config name)
+├── bench_array.sh      ← SLURM array job definition (CPU); takes (config, output_dir) args
+├── bench_array_gpu.sh  ← GPU counterpart (--gres=gpu:1, Abaki); used for any
+│                          config whose name contains "gpu"
+├── merge.sh            ← SLURM merge job (auto-triggered after array)
+├── run_benchmark.py    ← worker: runs one (dataset, model) cell, both first-order
+│                          and (for tree models) the order-2 interaction sweep
 ├── merge_results.py    ← merges per-task CSVs into results_<config_name>.csv
 ├── count_tasks.py      ← prints the number of task combinations for a given config
 └── logs/               ← per-task stdout/stderr (gitignored)
@@ -262,6 +295,10 @@ configs/
 ├── config-dimensionality.yaml      ← RQ: scalability with feature count (36 tasks)
 ├── config-tree.yaml                ← RQ: tree-native backends (18 tasks)
 └── config-neural-networks-RQ3.yaml ← RQ: gradient-based NN backends (9 tasks)
+├── config.yaml           ← model-agnostic sweep (libraries, approximators, models)
+├── config-tree.yaml      ← tree-specific sweep (tree backends, interactions)
+└── config-tree-gpu.yaml  ← woodelf cpu-vs-gpu sweep (path_dependent/interventional,
+                             each in a CPU and a GPU=True variant)
 
 Benchmarking/
 ├── runner.py            ← BenchmarkRunner — oracle + approximators per cell
@@ -271,11 +308,37 @@ Benchmarking/
 ├── results_config-dimensionality.csv     ← merged after step 5/7
 ├── results_config-tree.csv               ← merged after step 5/7
 ├── results_config-neural-networks-RQ3.csv ← merged after step 5/7
+├── runner.py            ← BenchmarkRunner — runs one oracle + backends/approximations per cell
+├── metrics.py            ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
+├── backends/             ← one class per (library, mode); tree_*.py / woodelf_backend.py /
+│                            fasttreeshap_backend.py / gputreeshap_backend.py are tree-specific
+├── results_config.csv         ← merged model-agnostic results (after step 5/7)
+├── results_config-tree.csv    ← merged tree results (after step 5/7)
+├── results_config-tree-gpu.csv ← merged woodelf cpu-vs-gpu results (after step 5/7)
 └── slurm_results/
     ├── config-accuracy/          ← per-task CSVs (gitignored)
     ├── config-dimensionality/    ← per-task CSVs (gitignored)
     ├── config-tree/              ← per-task CSVs (gitignored)
     └── config-neural-networks-RQ3/ ← per-task CSVs (gitignored)
+    ├── config/             ← model-agnostic run's per-task CSVs (gitignored)
+    ├── config-tree/        ← tree run's per-task CSVs (gitignored)
+    └── config-tree-gpu/    ← gpu run's per-task CSVs (gitignored)
+
+Models/
+├── dataset_and_models.py ← Dataset/Model enums; Model.is_tree gates the tree-specific sweep
+├── config_parser.py      ← load_config / load_dataset_config — expand a config.yaml into parameter lists
+└── trainers.py            ← SklearnTrainer / PytorchTrainer
+
+Datasets/
+└── load_datasets.py      ← dataset download/caching helpers (used by step 3)
+
+scripts/
+└── setup_fasttreeshap_env.sh  ← provisions the dedicated venv fasttreeshap needs (numpy<2);
+                                   run once before submitting a tree-config job that uses it
+
+tests/                    ← pytest suite — run with `uv run pytest tests/` before submitting
+pyproject.toml            ← project metadata and dependencies
+uv.lock                   ← locked dependency versions (synced in step 2)
 ```
 
 ---
