@@ -5,7 +5,7 @@ from typing import Type
 
 import pandas as pd
 
-from .backends.base_backend import BaseBackend
+from .backends.base_backend import BaseBackend, nan_result, nan_interaction_result
 from .eval_counter import CountingModel
 from .metrics import mean_abs_diff, relative_mae, sign_agreement, mean_sample_rho
 
@@ -59,7 +59,7 @@ class BenchmarkRunner:
 
         for cls in self.true_value_backends:
             t0 = time.perf_counter()
-            contrib = cls(model, background, self._shared_config()).run_explainer(X_eval)
+            contrib = self._safe_run(cls(model, background, self._shared_config()), X_eval)
             runtime = time.perf_counter() - t0
             results.append({
                 "cls": cls,
@@ -73,7 +73,7 @@ class BenchmarkRunner:
             counter = CountingModel(model)
             run_config = {**config, **self._shared_config()}
             t0 = time.perf_counter()
-            contrib = cls(counter, background, run_config).run_explainer(X_eval)
+            contrib = self._safe_run(cls(counter, background, run_config), X_eval)
             runtime = time.perf_counter() - t0
             results.append({
                 "cls": cls,
@@ -89,6 +89,19 @@ class BenchmarkRunner:
             rows.append(self._row(run_meta, candidate, results))
 
         self._append_to_csv(rows)
+
+    @staticmethod
+    def _safe_run(backend: BaseBackend, X_eval: pd.DataFrame) -> pd.DataFrame:
+        """One crashing backend must not discard the whole task: the CSV is
+        written only after every backend ran, so an unhandled exception in the
+        last backend would throw away hours of finished work. A crash becomes
+        an all-NaN row — a library's breaking point is itself a benchmark
+        result — and the traceback goes to the log."""
+        try:
+            return backend.run_explainer(X_eval)
+        except Exception as e:
+            print(f"  [CRASH] {backend.name}: {type(e).__name__}: {e} — recording all-NaN row")
+            return nan_interaction_result(X_eval) if backend.order == 2 else nan_result(X_eval)
 
     def _shared_config(self) -> dict:
         """seed/imputer for every backend, true-value ones included: the oracle
