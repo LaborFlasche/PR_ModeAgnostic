@@ -1,7 +1,10 @@
 import yaml
 import numpy as np
 from sklearn.model_selection import ParameterGrid
-from Models.dataset_and_models import Dataset, Model
+# Dataset/Model are imported lazily inside generate_trained_models: they pull in
+# torch via Models.trainers, which the SLURM submitters (submit_all.py,
+# count_tasks.py via task_grid) must not require — login nodes only have the
+# lightweight stack, the workers run inside the uv env.
 
 
 def as_list(value):
@@ -98,6 +101,8 @@ def load_seed(config_path: str, default: int = 42) -> int:
 
 
 def generate_trained_models(config_path: str, datasets=None) -> list:
+    from Models.dataset_and_models import Dataset, Model
+
     if datasets is None:
         datasets = list(Dataset)
 
