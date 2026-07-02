@@ -3,11 +3,19 @@ import time
 from pathlib import Path
 from typing import Type
 
+import numpy as np
 import pandas as pd
 
-from .backends.base_backend import BaseBackend, nan_result, nan_interaction_result
+from .backends.base_backend import BaseBackend, marginal_predict, nan_result, nan_interaction_result
 from .eval_counter import CountingModel
-from .metrics import mean_abs_diff, relative_mae, sign_agreement, mean_sample_rho
+from .metrics import (
+    mean_abs_diff,
+    relative_mae,
+    sign_agreement,
+    mean_sample_rho,
+    additivity_gap,
+    relative_additivity_gap,
+)
 
 
 class BenchmarkRunner:
@@ -54,6 +62,14 @@ class BenchmarkRunner:
         else:
             X_eval = X.iloc[self.n_background:self.n_background + self.n_eval]
 
+        # Additivity check target: every backend explains the same marginal
+        # value function f, so baseline + row-sum of contributions must equal
+        # f(x) (local accuracy). Computed on the raw model, not a
+        # CountingModel, so it never inflates any backend's n_model_evals.
+        f = marginal_predict(model, X.columns)
+        eval_preds = np.asarray(f(X_eval), dtype=float)
+        baseline = float(np.mean(np.asarray(f(background), dtype=float)))
+
         # --- run every backend once, record contributions and metadata ---
         results: list[dict] = []
 
@@ -86,7 +102,7 @@ class BenchmarkRunner:
         # --- emit one row per backend with pairwise metrics dict ---
         rows: list[dict] = []
         for candidate in results:
-            rows.append(self._row(run_meta, candidate, results))
+            rows.append(self._row(run_meta, candidate, results, eval_preds, baseline))
 
         self._append_to_csv(rows)
 
@@ -114,7 +130,7 @@ class BenchmarkRunner:
             config["imputer"] = self.imputer
         return config
 
-    def _row(self, run_meta, candidate, all_results) -> dict:
+    def _row(self, run_meta, candidate, all_results, eval_preds, baseline) -> dict:
         c_contrib = candidate["contrib"]
         cls = candidate["cls"]
         config = candidate["config"]
@@ -150,6 +166,8 @@ class BenchmarkRunner:
             "n_eval": len(c_contrib),
             "runtime_s": round(candidate["runtime"], 4),
             "n_model_evals": candidate["n_model_evals"],
+            "additivity_gap": additivity_gap(c_contrib, eval_preds, baseline),
+            "relative_additivity_gap": relative_additivity_gap(c_contrib, eval_preds, baseline),
             "shapley_values": json.dumps(c_contrib.values.flatten().tolist()),
             "shapley_n_eval": c_contrib.shape[0],
             "shapley_n_features": c_contrib.shape[1],

@@ -170,7 +170,7 @@ Datasets/
   dataset.md              # Dataset documentation incl. encoding strategy and feature-selection notes
 Benchmarking/
   runner.py                # BenchmarkRunner — runs one oracle + backends/approximations per cell
-  metrics.py                # mean_abs_diff, sign_agreement, mean_sample_rho, runtime
+  metrics.py                # pairwise accuracy + additivity metrics (see Benchmarking/README.md)
   backends/                 # one BaseBackend subclass per (library, mode); tree_*.py / woodelf_backend.py /
                              # fasttreeshap_backend.py / gputreeshap_backend.py are the tree-specific ones
 configs/
