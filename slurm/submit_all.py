@@ -116,8 +116,10 @@ def submit_task(config_key: str, task_id: int) -> int | None:
     ]
     if _is_nn(spec):
         # NN configs train with device=cuda — override single_task.sh's CPU
-        # partition with the GPU setup from bench_array_gpu.sh.
-        cmd += ["--partition=NvidiaAll", "--gres=gpu:1"]
+        # partition. No --gres: this cluster has no gres accounting (sinfo
+        # GRES=(null)); the NvidiaAll partition alone provides the GPU, and
+        # any --gres flag is rejected as "Invalid generic resource".
+        cmd += ["--partition=NvidiaAll"]
     cmd += [
         "slurm/single_task.sh",
         spec["worker"],
