@@ -10,15 +10,27 @@ class ShapIQTrueValueBackend(BaseBackend):
     library = "shapiq"
     computation_type = "true_value"
 
+    # Exact SVs need all 2**n coalitions, and shapiq's coalition sampler
+    # allocates np.zeros((budget, n)) up front — beyond ~2**30 that raises
+    # "Maximum allowed dimension exceeded" (ames: 2**79, gisette: 2**256).
+    # Above the cap this backend is therefore a best-effort KernelSHAP
+    # reference at MAX_BUDGET coalitions, not an exact oracle.
+    MAX_BUDGET = 2 ** 14
+
+    @classmethod
+    def effective_budget(cls, n_features: int) -> int:
+        """2**n_features (exact) while allocatable, else MAX_BUDGET."""
+        return min(2 ** n_features, cls.MAX_BUDGET)
+
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         columns = x.columns
         background_np = self.background.values.astype(float)
         x_np = x.values.astype(float)
         n_features = x_np.shape[1]
 
-        # budget = 2^n for exact Shapley values; shapiq approximates if budget
-        # exceeds available coalitions, so this is always the best-effort exact budget
-        budget = 2 ** n_features
+        budget = self.effective_budget(n_features)
+        seed = self.config.get("seed")
+        imputer = self.config.get("imputer", "marginal")
 
         def predict_fn(X: np.ndarray) -> np.ndarray:
             df = pd.DataFrame(X, columns=columns)
@@ -30,8 +42,10 @@ class ShapIQTrueValueBackend(BaseBackend):
         explainer = shapiq.TabularExplainer(
             model=predict_fn,
             data=background_np,
+            imputer=imputer,  # shared value function across all libraries (config-driven)
             index="SV",
             max_order=1,
+            random_state=seed,
         )
 
         rows = []

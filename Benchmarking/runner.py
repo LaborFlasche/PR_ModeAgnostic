@@ -59,7 +59,7 @@ class BenchmarkRunner:
 
         for cls in self.true_value_backends:
             t0 = time.perf_counter()
-            contrib = cls(model, background).run_explainer(X_eval)
+            contrib = cls(model, background, self._shared_config()).run_explainer(X_eval)
             runtime = time.perf_counter() - t0
             results.append({
                 "cls": cls,
@@ -71,11 +71,7 @@ class BenchmarkRunner:
 
         for cls, config in self.approximation_specs:
             counter = CountingModel(model)
-            run_config = {**config}
-            if self.seed is not None:
-                run_config["seed"] = self.seed
-            if self.imputer is not None:
-                run_config["imputer"] = self.imputer
+            run_config = {**config, **self._shared_config()}
             t0 = time.perf_counter()
             contrib = cls(counter, background, run_config).run_explainer(X_eval)
             runtime = time.perf_counter() - t0
@@ -93,6 +89,17 @@ class BenchmarkRunner:
             rows.append(self._row(run_meta, candidate, results))
 
         self._append_to_csv(rows)
+
+    def _shared_config(self) -> dict:
+        """seed/imputer for every backend, true-value ones included: the oracle
+        must target the same value function as the approximators and be
+        reproducible, or the seed/imputer columns on its CSV rows are fiction."""
+        config = {}
+        if self.seed is not None:
+            config["seed"] = self.seed
+        if self.imputer is not None:
+            config["imputer"] = self.imputer
+        return config
 
     def _row(self, run_meta, candidate, all_results) -> dict:
         c_contrib = candidate["contrib"]

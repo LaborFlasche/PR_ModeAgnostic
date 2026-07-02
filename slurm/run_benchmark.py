@@ -23,9 +23,8 @@ warnings.filterwarnings("ignore", message="The sample size is larger.*", categor
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
 import yaml
-from sklearn.model_selection import ParameterGrid
 
-from Models.config_parser import load_config, load_dataset_config, as_list
+from task_grid import build_all_runs
 from Models.dataset_and_models import Dataset, Model
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
@@ -77,28 +76,6 @@ INTERACTION_TRUE_VALUE_MAP = {
     "shapiq_tree": ShapIQInteractionBackend,
     "woodelf": WoodelfInteractionBackend,
 }
-
-
-def build_all_runs(config_path: str) -> list[tuple]:
-    """Every independent benchmark cell for a config, as (seed, dataset,
-    dataset_params, model, model_params, n_background) tuples — one per SLURM array
-    task. ``seed`` and ``n_background`` may each be a scalar or a list and are swept
-    as extra grid dimensions (see as_list)."""
-    model_config = load_config(config_path)
-    dataset_config = load_dataset_config(config_path)
-    with open(config_path) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    seeds = as_list(bench["seed"])
-    model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
-    dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
-    n_backgrounds = as_list(bench["n_background"])
-    return [
-        (seed, dk, dp, mk, mp, n_bg)
-        for seed in seeds
-        for dk, dp in dataset_runs
-        for mk, mp in model_runs
-        for n_bg in n_backgrounds
-    ]
 
 
 def main():

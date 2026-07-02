@@ -21,9 +21,8 @@ warnings.filterwarnings("ignore", message="The sample size is larger.*", categor
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
 import yaml
-from sklearn.model_selection import ParameterGrid
 
-from Models.config_parser import load_config, load_dataset_config
+from task_grid import build_all_runs_nn
 from Models.dataset_and_models import Dataset, Model
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
@@ -67,22 +66,19 @@ def build_approx_specs(bench: dict) -> list[tuple]:
     ]
 
 
-def build_all_runs(config_path: str) -> list[tuple]:
-    model_config = load_config(config_path)
-    dataset_config = load_dataset_config(config_path)
-    with open(config_path) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
-    dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
-    n_backgrounds = bench["n_background"]
-    if isinstance(n_backgrounds, int):
-        n_backgrounds = [n_backgrounds]
-    return [
-        (dk, dp, mk, mp, n_bg)
-        for dk, dp in dataset_runs
-        for mk, mp in model_runs
-        for n_bg in n_backgrounds
-    ]
+def build_run_meta(dataset: str, dataset_params: dict, model: str,
+                   n_background: int, device: str) -> dict:
+    """Per-row metadata for the results CSV. ``device`` is recorded so cpu and
+    cuda sweeps of the same config stay distinguishable after merging (the GPU
+    research question needs this axis)."""
+    return {
+        "dataset": dataset,
+        "model": model,
+        "order": 1,
+        "n_background": n_background,
+        "device": device,
+        **dataset_params,
+    }
 
 
 def main():
@@ -93,7 +89,7 @@ def main():
     parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
     args = parser.parse_args()
 
-    all_runs = build_all_runs(args.config)
+    all_runs = build_all_runs_nn(args.config)
     if args.task_id >= len(all_runs):
         print(f"task-id {args.task_id} out of range (max {len(all_runs) - 1})", file=sys.stderr)
         sys.exit(1)
@@ -140,7 +136,7 @@ def main():
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": n_background, **dp},
+        run_meta=build_run_meta(dk, dp, mk, n_background, device),
     )
 
     print(f"[task {args.task_id}] done -> {output_csv}")

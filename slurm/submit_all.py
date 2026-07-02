@@ -24,8 +24,9 @@ from collections import defaultdict
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-from sklearn.model_selection import ParameterGrid
-from Models.config_parser import load_config, load_dataset_config
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from task_grid import build_all_runs, build_all_runs_nn
 
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls
@@ -54,10 +55,17 @@ CONFIG_REGISTRY = {
 # Task counting
 # ---------------------------------------------------------------------------
 
-def count_tasks(config_path: str) -> int:
-    model_runs = [p for pg in load_config(config_path).values() for p in ParameterGrid(pg)]
-    dataset_runs = [p for pg in load_dataset_config(config_path).values() for p in ParameterGrid(pg)]
-    return len(model_runs) * len(dataset_runs)
+def _is_nn(spec: dict) -> bool:
+    return spec["worker"].endswith("run_benchmark_nn.py")
+
+
+def count_tasks(config_key: str) -> int:
+    """Number of task-ids the worker script will index into — built through the
+    same task_grid functions the workers use, so seed/n_background sweeps can
+    never make submission and indexing disagree."""
+    spec = CONFIG_REGISTRY[config_key]
+    build_fn = build_all_runs_nn if _is_nn(spec) else build_all_runs
+    return len(build_fn(spec["config"]))
 
 
 # ---------------------------------------------------------------------------
@@ -101,19 +109,23 @@ def submit_task(config_key: str, task_id: int) -> int | None:
 
     os.makedirs(os.path.join(REPO_ROOT, output_dir), exist_ok=True)
 
-    result = subprocess.run(
-        [
-            "sbatch",
-            f"--job-name=bench_{config_key[:3]}_{task_id}",
-            f"--chdir={REPO_ROOT}",
-            "slurm/single_task.sh",
-            spec["worker"],
-            str(task_id),
-            config_path,
-            output_dir,
-        ],
-        capture_output=True, text=True, cwd=REPO_ROOT,
-    )
+    cmd = [
+        "sbatch",
+        f"--job-name=bench_{config_key[:3]}_{task_id}",
+        f"--chdir={REPO_ROOT}",
+    ]
+    if _is_nn(spec):
+        # NN configs train with device=cuda — override single_task.sh's CPU
+        # partition with the GPU setup from bench_array_gpu.sh.
+        cmd += ["--partition=NvidiaAll", "--gres=gpu:1"]
+    cmd += [
+        "slurm/single_task.sh",
+        spec["worker"],
+        str(task_id),
+        config_path,
+        output_dir,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
 
     if result.returncode != 0:
         print(f"  ERROR submitting {config_key}/{task_id}: {result.stderr.strip()}", file=sys.stderr)
@@ -160,7 +172,7 @@ def run(selected: list[str]) -> None:
     print("Config task counts:")
     for key in selected:
         cfg = CONFIG_REGISTRY[key]["config"]
-        n = count_tasks(cfg)
+        n = count_tasks(key)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
         for task_id in range(n):
             pending.append((key, task_id))

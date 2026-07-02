@@ -27,12 +27,11 @@ CONFIG_NAME="$(basename "$CONFIG" .yaml)"
 OUTPUT_DIR="Benchmarking/slurm_results/$CONFIG_NAME"
 MERGED_CSV="Benchmarking/results_$CONFIG_NAME.csv"
 
-# GPU configs (name contains "gpu", e.g. configs/config-tree-gpu.yaml) need a
-# GPU node (--gres=gpu:1, Abaki partition) — see slurm/bench_array_gpu.sh.
-ARRAY_SCRIPT="slurm/bench_array.sh"
-if [[ "$CONFIG_NAME" == *gpu* ]]; then
-    ARRAY_SCRIPT="slurm/bench_array_gpu.sh"
-fi
+# GPU configs (name contains "gpu") run bench_array_gpu.sh, NN configs
+# bench_array_nn.sh, everything else bench_array.sh — one shared mapping so the
+# choice can't diverge between call sites (see slurm/select_array_script.sh).
+source "$REPO_ROOT/slurm/select_array_script.sh"
+ARRAY_SCRIPT="$(select_array_script "$CONFIG")"
 
 # Count (dataset × model) combinations from the config
 N=$(~/.local/bin/uv run python slurm/count_tasks.py "$CONFIG")
@@ -44,14 +43,6 @@ mkdir -p slurm/logs "$OUTPUT_DIR"
 # are merged into $MERGED_CSV at the end. Clearing them prevents stale files from a
 # previous sweep (possibly a different task count or column schema) leaking into the merge.
 rm -f "$OUTPUT_DIR"/results_*.csv
-
-# Pick the right array script: NN configs use run_benchmark_nn.py, others use
-# run_benchmark.py.
-if [[ "$CONFIG" == *neural-networks* ]]; then
-    ARRAY_SCRIPT="slurm/bench_array_nn.sh"
-else
-    ARRAY_SCRIPT="slurm/bench_array.sh"
-fi
 
 ARRAY_JOB=$(sbatch \
     --array=0-$((N - 1)) \

@@ -3,9 +3,12 @@ benchmark:
   imputer: marginal
   n_background: 50
   n_eval: 5
-  libraries: [captum, shap_nn, lightshap, dalex]
-  approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation]
+  libraries: [captum, shap_nn, lightshap, dalex, shapiq_proxy]
+  approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation, proxy]
   budgets: [64]
+  # "tree" instead of the "xgboost" production default: with torch imported,
+  # xgboost segfaults on macOS arm64 (see ShapIQProxyBackend docstring).
+  proxy_model: tree
   nn_true_value_libraries: [shapiq]
   device: cpu # cuda for GPU and cpu for CPU.
 

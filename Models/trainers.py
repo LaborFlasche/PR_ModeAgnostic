@@ -178,8 +178,10 @@ class PytorchTrainer(ModelTrainer):
         X_t = torch.tensor(X_np, dtype=torch.float32)
 
         if task == "classification":
-            # Shift labels to 0-indexed (e.g. Covertype uses 1-7)
-            y_np = y_np - y_np.min()
+            # Remap labels to canonical 0..n_classes-1 (Covertype uses 1-7,
+            # gisette -1/1 — a plain min-shift would leave gaps and inflate the
+            # class count). Sorted-order remap, matching SklearnTrainer.
+            y_np = np.unique(y_np, return_inverse=True)[1]
             out_features = int(y_np.max()) + 1
             y_t = torch.tensor(y_np, dtype=torch.long)
             loss_fn = nn.CrossEntropyLoss()

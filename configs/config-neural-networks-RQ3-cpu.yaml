@@ -18,7 +18,7 @@ benchmark:
   # up to MAX_BUDGET=2^14, i.e. adult_census; on ames/gisette it degrades to a
   # best-effort KernelSHAP reference at 2^14 coalitions.
   nn_true_value_libraries: [shapiq]
-  device: cuda # cuda for GPU and cpu for CPU.
+  device: cpu # cuda for GPU and cpu for CPU.
 
 models:
   mlp:

@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=nn_bench
-#SBATCH --partition=Krater
+#SBATCH --partition=NvidiaAll
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=2
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm/logs/bench_nn_%A_%a.out

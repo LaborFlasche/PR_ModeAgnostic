@@ -7,8 +7,8 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm/logs/task_%j.out
 #SBATCH --error=slurm/logs/task_%j.err
-# Note: NN jobs (run_benchmark_nn.py) use device=cuda from the config. If Krater
-# does not auto-assign a GPU, add --gres=gpu:1 to the sbatch call in submit_all.py
-# for entries whose worker_script is slurm/run_benchmark_nn.py.
+# Note: NN jobs (run_benchmark_nn.py) use device=cuda from the config —
+# submit_all.py overrides the partition/gres above with --partition=NvidiaAll
+# --gres=gpu:1 for entries whose worker_script is slurm/run_benchmark_nn.py.
 
 ~/.local/bin/uv run python "$1" --task-id "$2" --config "$3" --output-dir "$4"
