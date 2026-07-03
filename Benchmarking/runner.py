@@ -5,9 +5,10 @@ from typing import Type
 
 import pandas as pd
 
-from .backends.base_backend import BaseBackend
+from .backends.base_backend import BaseBackend, nan_result, nan_interaction_result
 from .eval_counter import CountingModel
 from .metrics import mean_abs_diff, relative_mae, sign_agreement, mean_sample_rho
+from .timeout import BackendTimeout, time_limit
 
 
 class BenchmarkRunner:
@@ -26,6 +27,7 @@ class BenchmarkRunner:
         n_eval: int | None = None,
         seed: int | None = None,
         imputer: str | None = None,
+        backend_timeout_s: float | None = None,
     ):
         self.true_value_backends = true_value_backends
         self.approximation_specs = approximation_specs
@@ -34,6 +36,7 @@ class BenchmarkRunner:
         self.n_eval = n_eval
         self.seed = seed
         self.imputer = imputer
+        self.backend_timeout_s = backend_timeout_s
 
     def run(self, model, X: pd.DataFrame, run_meta: dict) -> None:
         if len(X) <= self.n_background:
@@ -59,7 +62,12 @@ class BenchmarkRunner:
 
         for cls in self.true_value_backends:
             t0 = time.perf_counter()
-            contrib = cls(model, background).run_explainer(X_eval)
+            try:
+                with time_limit(self.backend_timeout_s):
+                    contrib = cls(model, background).run_explainer(X_eval)
+            except BackendTimeout:
+                print(f"  [SKIP] {cls.name}: exceeded {self.backend_timeout_s}s timeout")
+                contrib = nan_result(X_eval) if cls.order == 1 else nan_interaction_result(X_eval)
             runtime = time.perf_counter() - t0
             results.append({
                 "cls": cls,

@@ -17,7 +17,7 @@ from .woodelf_backend import (
 )
 from .captum_backend import CaptumApproxBackend
 from .shap_nn_backend import ShapNNApproxBackend
-from .fasttreeshap_backend import FastTreeShapBackend
+from .fasttreeshap_backend import FastTreeShapBackend, FastTreeShapInteractionBackend
 from .gputreeshap_backend import GPUTreeShapBackend, GPUTreeShapInteractionBackend
 
 __all__ = [
@@ -38,6 +38,7 @@ __all__ = [
     "WoodelfGPUInterventionalBackend",
     "WoodelfInteractionBackend",
     "FastTreeShapBackend",
+    "FastTreeShapInteractionBackend",
     "GPUTreeShapBackend",
     "GPUTreeShapInteractionBackend",
     "CaptumApproxBackend",

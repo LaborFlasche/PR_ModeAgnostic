@@ -27,9 +27,13 @@ def main():
 
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
 
+    # Model hyperparameters (e.g. max_depth swept in configs/config-tree.yaml) are part
+    # of the identity key too, so different values don't collapse into one row. Only
+    # included if present, since non-tree configs' models don't share these param names.
+    hyperparam_cols = [c for c in ("n_estimators", "max_depth", "learning_rate") if c in df.columns]
     df = df.drop_duplicates(
         subset=["dataset", "model", "n_features", "n_samples", "seed", "n_background",
-                "backend", "approximator", "budget"],
+                "backend", "approximator", "budget"] + hyperparam_cols,
         keep="last",
     )
 
