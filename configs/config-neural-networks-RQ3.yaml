@@ -13,6 +13,8 @@ benchmark:
   libraries: [captum, shap_nn, lightshap, dalex, shapiq_proxy]
   approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation, proxy]
   budgets: [512]
+  # Proxy model fitted by ProxySHAP
+  proxy_model: xgboost
   # shapiq uses ShapIQTrueValueBackend (TabularExplainer with auto-selected
   # approximator, no explicit approximator sweep).
   nn_true_value_libraries: [shapiq]
