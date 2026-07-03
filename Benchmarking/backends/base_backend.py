@@ -43,7 +43,20 @@ def marginal_predict(model, columns):
         if hasattr(model, "predict_proba"):
             out = np.asarray(model.predict_proba(df))
             return out[:, 1] if out.shape[1] == 2 else out[:, 0]
-        return np.asarray(model.predict(df), dtype=float)
+        out = np.asarray(model.predict(df), dtype=float)
+        # A 2D (n, 1) output would silently broadcast against the 1D
+        # contribution row-sums in the additivity metrics, turning the gap
+        # into an (n, n) matrix with a plausible-looking wrong mean. Squeeze
+        # it; a genuinely multi-output regressor has no single scalar game.
+        if out.ndim == 2 and out.shape[1] == 1:
+            return out[:, 0]
+        if out.ndim != 1:
+            raise ValueError(
+                f"marginal_predict requires 1D predictions; model.predict "
+                f"returned shape {out.shape} (multi-output regressors are "
+                "unsupported)"
+            )
+        return out
 
     return f
 

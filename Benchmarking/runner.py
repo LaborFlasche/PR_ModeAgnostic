@@ -134,6 +134,7 @@ class BenchmarkRunner:
         c_contrib = candidate["contrib"]
         cls = candidate["cls"]
         config = candidate["config"]
+        gap = additivity_gap(c_contrib, eval_preds, baseline)
 
         pairwise = {}
         for reference in all_results:
@@ -166,8 +167,8 @@ class BenchmarkRunner:
             "n_eval": len(c_contrib),
             "runtime_s": round(candidate["runtime"], 4),
             "n_model_evals": candidate["n_model_evals"],
-            "additivity_gap": additivity_gap(c_contrib, eval_preds, baseline),
-            "relative_additivity_gap": relative_additivity_gap(c_contrib, eval_preds, baseline),
+            "additivity_gap": gap,
+            "relative_additivity_gap": relative_additivity_gap(c_contrib, eval_preds, baseline, gap=gap),
             "shapley_values": json.dumps(c_contrib.values.flatten().tolist()),
             "shapley_n_eval": c_contrib.shape[0],
             "shapley_n_features": c_contrib.shape[1],

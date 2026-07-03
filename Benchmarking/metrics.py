@@ -44,17 +44,24 @@ def additivity_gap(contrib: pd.DataFrame, preds: np.ndarray, baseline: float) ->
     return float(np.abs(gaps).mean())
 
 
-def relative_additivity_gap(contrib: pd.DataFrame, preds: np.ndarray, baseline: float) -> float:
+def relative_additivity_gap(
+    contrib: pd.DataFrame, preds: np.ndarray, baseline: float, gap: float | None = None
+) -> float:
     """``additivity_gap`` normalized by mean |f(x_i) - baseline|, the total
     attribution mass the values are supposed to account for. Dimensionless
     (0 = perfect), so comparable across datasets, like ``relative_mae``.
     Returns NaN when every prediction equals the baseline.
+
+    Callers that already computed ``additivity_gap`` can pass it as ``gap``
+    to avoid summing the contribution matrix a second time.
     """
     preds = np.asarray(preds, dtype=float)
     denom = float(np.abs(preds - baseline).mean())
     if denom == 0:
         return float("nan")
-    return additivity_gap(contrib, preds, baseline) / denom
+    if gap is None:
+        gap = additivity_gap(contrib, preds, baseline)
+    return gap / denom
 
 
 def mean_sample_rho(a: pd.DataFrame, b: pd.DataFrame) -> float:
