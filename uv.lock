@@ -1491,7 +1491,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.8.0" },
     { name = "shap", specifier = ">=0.51.0" },
     { name = "shapflow", specifier = ">=0.0.1" },
-    { name = "shapiq", specifier = ">=1.4.1" },
+    { name = "shapiq", specifier = ">=1.5.0" },
     { name = "torch", specifier = ">=2.12.0" },
     { name = "woodelf-explainer", specifier = ">=0.4.3" },
     { name = "xgboost", specifier = ">=2.0.0" },

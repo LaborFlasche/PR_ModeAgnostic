@@ -73,6 +73,20 @@ class Model(Enum):
 
     # 3) Neuronale Netzwerke (PyTorch)
     PYTORCH_NEURAL_NETWORK = "pytorch_neural_network"
+    # Config-driven architectures (config-neural-networks-RQ3.yaml); values match
+    # PytorchTrainer._ARCH_REGISTRY keys so architecture=self.value dispatches.
+    MLP = "mlp"
+    TRANSFORMER = "transformer"
+    CNN_1D = "cnn_1d"
+
+    @property
+    def is_nn(self) -> bool:
+        return self in {
+            Model.PYTORCH_NEURAL_NETWORK,
+            Model.MLP,
+            Model.TRANSFORMER,
+            Model.CNN_1D,
+        }
 
     @property
     def is_tree(self) -> bool:
@@ -121,7 +135,10 @@ class Model(Enum):
 
         elif self == Model.PYTORCH_NEURAL_NETWORK:
             return PytorchTrainer()
-            
+
+        elif self in (Model.MLP, Model.TRANSFORMER, Model.CNN_1D):
+            return PytorchTrainer(architecture=self.value)
+
         else:
             raise ValueError(f"Unknown model: {self.value}")
 
@@ -192,6 +209,12 @@ class Model(Enum):
                 model = LGBMClassifier(**{**base_lgbm, **params})
             return SklearnTrainer(model)
 
+        elif self in (Model.MLP, Model.TRANSFORMER, Model.CNN_1D):
+            # PytorchTrainer seeds torch itself (no sklearn random_state);
+            # epochs/lr/batch_size/device are named kwargs, architecture-specific
+            # keys (hidden_sizes, d_model, ...) flow through **arch_kwargs.
+            return PytorchTrainer(architecture=self.value, seed=seed, **params)
+
         else:
             raise ValueError(f"Model {self.value} does not support hyperparameter config")
 
@@ -200,4 +223,4 @@ class Model(Enum):
         if pytorch:
             return [Model.PYTORCH_NEURAL_NETWORK]
         else:
-            return [model for model in Model if model != Model.PYTORCH_NEURAL_NETWORK]
+            return [model for model in Model if not model.is_nn]

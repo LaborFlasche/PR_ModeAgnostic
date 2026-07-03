@@ -5,13 +5,16 @@ benchmark:
   n_eval: 100
   # Approximation sweep (library × approximator × budget), filtered by
   # each backend's SUPPORTED_APPROXIMATORS:
-  #   captum    -> gradient_shap, deep_lift_shap  (NN gradient-based)
-  #   shap_nn   -> gradient, deep                 (NN gradient-based)
-  #   lightshap -> kernel, permutation            (model-agnostic)
-  #   dalex     -> permutation                    (model-agnostic)
-  libraries: [captum, shap_nn, lightshap, dalex]
-  approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation]
+  #   captum       -> gradient_shap, deep_lift_shap  (NN gradient-based)
+  #   shap_nn      -> gradient, deep                 (NN gradient-based)
+  #   lightshap    -> kernel, permutation            (model-agnostic)
+  #   dalex        -> permutation                    (model-agnostic)
+  #   shapiq_proxy -> proxy                          (model-agnostic, ProxySHAP)
+  libraries: [captum, shap_nn, lightshap, dalex, shapiq_proxy]
+  approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation, proxy]
   budgets: [512]
+  # Proxy model fitted by ProxySHAP
+  proxy_model: xgboost
   # shapiq uses ShapIQTrueValueBackend (TabularExplainer with auto-selected
   # approximator, no explicit approximator sweep).
   nn_true_value_libraries: [shapiq]
