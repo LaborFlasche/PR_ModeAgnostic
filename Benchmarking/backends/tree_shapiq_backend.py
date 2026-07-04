@@ -37,12 +37,16 @@ class ShapIQTreePathDependentBackend(_ShapIQTreeBackend):
 
 
 class ShapIQTreeInterventionalBackend(_ShapIQTreeBackend):
-    """shapiq's interventional TreeExplainer. NOT WIRED INTO PRODUCTION:
-    confirmed to hang on real XGBoost/LightGBM and segfault on plain sklearn
-    models (non-deterministically, depending on tree topology) in this
-    dependency stack (shapiq 1.5.0 + numba 0.65.1 + llvmlite 0.47.0, macOS
-    arm64) — not an import-order issue. Kept for reference; re-verify before
-    re-enabling."""
+    """shapiq's interventional TreeExplainer. Previously excluded from
+    TREE_TRUE_VALUE_MAP: reported to hang on real XGBoost/LightGBM and segfault
+    on plain sklearn models (non-deterministically, depending on tree topology)
+    against shapiq 1.5.0 + numba 0.65.1 + llvmlite 0.47.0 (macOS arm64) — not an
+    import-order issue. Re-verified against shapiq 1.5.2 (same numba/llvmlite,
+    same machine) across configs/config-tree.yaml's full grid — both models,
+    every max_depth (4-50), every n_features (4-256) — with no hangs or
+    crashes, so it's wired back in. Since the original report was
+    topology-dependent, BenchmarkRunner's backend_timeout_s is the safety net
+    if an untested topology still trips it."""
 
     name = "shapiq_tree_interventional"
     mode = "interventional"
