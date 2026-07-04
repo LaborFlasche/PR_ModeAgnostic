@@ -1,8 +1,8 @@
 benchmark:
-  seed: 42
+  seed: [0,1,2,3,4,5,6,7,8,9]
   imputer: marginal
-  n_background: 200
-  n_eval: 100
+  n_background: 100
+  n_eval: 10
   # Approximation sweep (library × approximator × budget), filtered by
   # each backend's SUPPORTED_APPROXIMATORS:
   #   captum       -> gradient_shap, deep_lift_shap  (NN gradient-based)

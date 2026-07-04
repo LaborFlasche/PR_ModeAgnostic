@@ -4,10 +4,10 @@ benchmark:
   # and every stochastic approximator (shap, shapiq, lightshap, dalex), so changing
   # this one value reseeds the whole experiment reproducibly. Recorded per row in the
   # results CSV. There are no hardcoded fallback seeds anywhere downstream.
-  seed: 42
+  seed: [0,1,2,3,4,5,6,7,8,9]
   # Number of rows used as the imputer background / reference set (defines the
   # marginal value function). Cost per explanation scales with this;
-  n_background: [32]
+  n_background: 100
   # Number of instances actually explained and averaged per (model, dataset) cell.
   # The main runtime lever. The averaged accuracy metrics stabilise after a few
   # hundred points, so a small value keeps representativeness while cutting runtime
