@@ -133,8 +133,8 @@ sinfo
 
 For `configs/config.yaml` / `configs/config-tree.yaml` (CPU only) any standard
 partition works — `Krater`, `Gesteine_A`, etc. `configs/config-tree-gpu.yaml`
-needs a GPU node — Abaki — requested via `slurm/bench_array_gpu.sh`'s
-`--gres=gpu:1`.
+and the NN config need a GPU node — the `NvidiaAll` partition, targeted by
+`slurm/bench_array_gpu.sh` and `submit_all.py`'s `nn`/`tree-gpu` entries.
 
 If the partition name differs from what is set in `slurm/bench_array.sh` /
 `slurm/bench_array_gpu.sh`, edit the `--partition=` line there before submitting.
@@ -143,10 +143,11 @@ differs on your allocation, edit the `--partition=` line in
 `slurm/bench_array.sh`, `slurm/bench_array_nn.sh`, and `slurm/single_task.sh`
 before submitting.
 
-> **Note on GPU for NN jobs:** `config-neural-networks-RQ3.yaml` sets
-> `device: cuda`. If Krater does not auto-assign a GPU, add `--gres=gpu:1` to
-> the `sbatch` call inside `submit_all.py` for `nn` config entries (look for the
-> comment in `slurm/single_task.sh`).
+> **Note on GPU jobs:** the CIP cluster defines no GPU GRES — `sinfo -o "%P %G"`
+> shows `GRES=(null)` on every partition — so `--gres=gpu:1` / `--gpus=1` are
+> rejected with `Invalid generic resource specification`. Do not add them.
+> Requesting `--partition=NvidiaAll` alone is sufficient: the node's GPU is
+> directly visible to the job.
 
 ---
 
@@ -214,7 +215,7 @@ bash slurm/submit.sh configs/config-tree-gpu.yaml  # woodelf cpu-vs-gpu sweep (n
 
 Run any subset — each gets its own output directory and merged CSV, so they
 never collide. `submit.sh` picks the array script automatically:
-`slurm/bench_array_gpu.sh` (requests `--gres=gpu:1` on Abaki) for any config
+`slurm/bench_array_gpu.sh` (targets the `NvidiaAll` partition) for any config
 whose name contains "gpu", otherwise `slurm/bench_array.sh`. This script:
 1. Counts the `(dataset × model)` combinations from the given config.
 2. Submits a SLURM **array job** — one task per combination, each writing to its
@@ -292,7 +293,7 @@ slurm/
 ├── submit.sh           ← entry point: run this to submit everything (picks the
 │                          array script below based on the config name)
 ├── bench_array.sh      ← SLURM array job definition (CPU); takes (config, output_dir) args
-├── bench_array_gpu.sh  ← GPU counterpart (--gres=gpu:1, Abaki); used for any
+├── bench_array_gpu.sh  ← GPU counterpart (NvidiaAll partition); used for any
 │                          config whose name contains "gpu"
 ├── merge.sh            ← SLURM merge job (auto-triggered after array)
 ├── run_benchmark.py    ← worker: runs one (dataset, model) cell, both first-order
