@@ -178,8 +178,12 @@ class PytorchTrainer(ModelTrainer):
         X_t = torch.tensor(X_np, dtype=torch.float32)
 
         if task == "classification":
-            # Shift labels to 0-indexed (e.g. Covertype uses 1-7)
-            y_np = y_np - y_np.min()
+            # Remap labels to canonical 0..n_classes-1 like SklearnTrainer: a plain
+            # min-shift breaks non-consecutive labels (gisette's -1/1 became 0/2 →
+            # a 3-class head with a dead class, and TorchPredictor then explained
+            # class 0 = the negative class). Sorted-order remap keeps class 1 =
+            # the higher original label, matching predict_proba[:, 1] downstream.
+            y_np = np.unique(y_np, return_inverse=True)[1]
             out_features = int(y_np.max()) + 1
             y_t = torch.tensor(y_np, dtype=torch.long)
             loss_fn = nn.CrossEntropyLoss()

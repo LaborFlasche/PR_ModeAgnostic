@@ -23,7 +23,9 @@ def relative_mae(a: pd.DataFrame, b: pd.DataFrame) -> float:
 
 
 def sign_agreement(a: pd.DataFrame, b: pd.DataFrame) -> float:
-    mask = (a != 0) & (b != 0)
+    # NaN != 0 is True, so all-NaN frames (timed-out/skipped backends) would pass
+    # the mask and read as 0.0 (total disagreement) instead of NaN (missing).
+    mask = (a != 0) & (b != 0) & a.notna() & b.notna()
     total = mask.sum().sum()
     if total == 0:
         return float("nan")

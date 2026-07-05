@@ -6,9 +6,22 @@ from .base_backend import BaseBackend, marginal_predict
 
 
 class ShapIQTrueValueBackend(BaseBackend):
+    """Exact Shapley values via full coalition enumeration, feasible only up to
+    ``_EXACT_MAX_FEATURES``. Above that the budget is capped at
+    ``2**_EXACT_MAX_FEATURES``: shapiq 1.5.x otherwise tries to allocate a
+    2^n-element array and crashes ("Maximum allowed dimension exceeded"), and
+    exact values are computationally impossible anyway. Capped cells are a
+    budget-capped *reference*, not ground truth — interpret accuracy metrics
+    against them as agreement, not error."""
+
     name = "shapiq_true_value"
     library = "shapiq"
     computation_type = "true_value"
+
+    # 2^14 = 16384 coalitions: exact for adult_census (14 features, the widest
+    # cell meant to have a true oracle) and still tractable as a capped
+    # reference budget for the wide NN cells (ames 79, gisette 256).
+    _EXACT_MAX_FEATURES = 14
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         columns = x.columns
@@ -16,9 +29,15 @@ class ShapIQTrueValueBackend(BaseBackend):
         x_np = x.values.astype(float)
         n_features = x_np.shape[1]
 
-        # budget = 2^n for exact Shapley values; shapiq approximates if budget
-        # exceeds available coalitions, so this is always the best-effort exact budget
-        budget = 2 ** n_features
+        # budget = 2^n enumerates every coalition (exact); capped for wide inputs
+        budget = 2 ** min(n_features, self._EXACT_MAX_FEATURES)
+        if n_features > self._EXACT_MAX_FEATURES:
+            print(
+                f"  [WARN] {self.name}: n_features={n_features} > "
+                f"{self._EXACT_MAX_FEATURES} — budget capped at 2^"
+                f"{self._EXACT_MAX_FEATURES}={budget}; reference values are "
+                "approximate, not exact"
+            )
 
         def predict_fn(X: np.ndarray) -> np.ndarray:
             df = pd.DataFrame(X, columns=columns)
