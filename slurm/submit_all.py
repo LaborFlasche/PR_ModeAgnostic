@@ -34,6 +34,10 @@ POLL_INTERVAL = 60  # seconds between squeue polls
 # "sbatch_args" override slurm/single_task.sh's #SBATCH directives (CLI options
 # take precedence): the nn config runs with device=cuda and the tree-gpu config
 # exercises woodelf's cupy path, so both need a GPU node instead of Krater.
+# The CIP cluster defines no GPU GRES (sinfo shows GRES=(null) on every
+# partition), so --gres/--gpus flags are rejected with "Invalid generic
+# resource specification" — requesting the NvidiaAll partition alone is both
+# necessary and sufficient; the node's GPU is directly visible to the job.
 CONFIG_REGISTRY = {
     "accuracy": {
         "config": "configs/config-accuracy.yaml",
@@ -50,12 +54,12 @@ CONFIG_REGISTRY = {
     "nn": {
         "config": "configs/config-neural-networks-RQ3.yaml",
         "worker": "slurm/run_benchmark_nn.py",
-        "sbatch_args": ["--partition=NvidiaAll", "--gres=gpu:1"],
+        "sbatch_args": ["--partition=NvidiaAll"],
     },
     "tree-gpu": {
         "config": "configs/config-tree-gpu.yaml",
         "worker": "slurm/run_benchmark.py",
-        "sbatch_args": ["--partition=NvidiaAll", "--gres=gpu:1"],
+        "sbatch_args": ["--partition=NvidiaAll"],
     },
 }
 
