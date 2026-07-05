@@ -34,6 +34,7 @@ class BenchmarkRunner:
         n_eval: int | None = None,
         seed: int | None = None,
         imputer: str | None = None,
+        backend_timeout_s: float | None = None,
     ):
         self.true_value_backends = true_value_backends
         self.approximation_specs = approximation_specs
@@ -42,6 +43,7 @@ class BenchmarkRunner:
         self.n_eval = n_eval
         self.seed = seed
         self.imputer = imputer
+        self.backend_timeout_s = backend_timeout_s
 
     def run(self, model, X: pd.DataFrame, run_meta: dict) -> None:
         if len(X) <= self.n_background:

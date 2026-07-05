@@ -36,6 +36,7 @@ from Benchmarking.backends import (
     ShapTreePathDependentBackend,
     ShapInteractionBackend,
     ShapIQTreePathDependentBackend,
+    ShapIQTreeInterventionalBackend,
     ShapIQInteractionBackend,
     WoodelfTreePathDependentBackend,
     WoodelfTreeInterventionalBackend,
@@ -43,6 +44,7 @@ from Benchmarking.backends import (
     WoodelfGPUInterventionalBackend,
     WoodelfInteractionBackend,
     FastTreeShapBackend,
+    FastTreeShapInteractionBackend,
 )
 # GPUTreeShapBackend/GPUTreeShapInteractionBackend exist in Benchmarking.backends
 # for future use but aren't wired in here yet (XGBoost-only, unverified on real
@@ -56,13 +58,17 @@ APPROX_MAP = {
 }
 
 # Tree-specific true-value backends, only applied to tree models (Model.is_tree).
-# Keyed by (library, mode). No ("shapiq_tree", "interventional") entry: it
-# crashes in this dependency stack — see tree_shapiq_backend.py.
+# Keyed by (library, mode). shapiq_tree interventional was previously excluded
+# (reported hangs/segfaults against shapiq 1.5.0) but re-verified clean against
+# shapiq 1.5.2 across the full config-tree.yaml depth/feature-count grid — see
+# ShapIQTreeInterventionalBackend's docstring. backend_timeout_s (BenchmarkRunner)
+# is the safety net if it still misbehaves on an untested topology.
 # "gpu_path_dependent"/"gpu_interventional" run woodelf's GPU=True (cupy-backed)
 # path — unverified on real GPU hardware, skips to all-NaN without a CUDA device.
 TREE_TRUE_VALUE_MAP = {
     ("shap_tree", "path_dependent"): ShapTreePathDependentBackend,
     ("shapiq_tree", "path_dependent"): ShapIQTreePathDependentBackend,
+    ("shapiq_tree", "interventional"): ShapIQTreeInterventionalBackend,
     ("woodelf", "path_dependent"): WoodelfTreePathDependentBackend,
     ("woodelf", "interventional"): WoodelfTreeInterventionalBackend,
     ("woodelf", "gpu_path_dependent"): WoodelfGPUPathDependentBackend,
@@ -72,9 +78,12 @@ TREE_TRUE_VALUE_MAP = {
 
 # Pairwise-interaction (order-2) backends, path-dependent only. "shap_tree" is
 # absent: ShapInteractionBackend is hardcoded as the always-on oracle below.
+# fasttreeshap does support interactions (shap_interaction_values), just not via
+# its faster "v2" algorithm — see FastTreeShapInteractionBackend's docstring.
 INTERACTION_TRUE_VALUE_MAP = {
     "shapiq_tree": ShapIQInteractionBackend,
     "woodelf": WoodelfInteractionBackend,
+    "fasttreeshap": FastTreeShapInteractionBackend,
 }
 
 
@@ -138,11 +147,12 @@ def main():
         n_eval=bench["n_eval"],
         seed=seed,
         imputer=imputer,
+        backend_timeout_s=bench.get("backend_timeout_s"),
     )
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": n_background, **dp},
+        run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": n_background, **dp, **mp},
     )
 
     # Pairwise interactions: a separate runner.run() call (different oracle,
@@ -169,11 +179,12 @@ def main():
                 n_eval=bench["n_eval"],
                 seed=seed,
                 imputer=imputer,
+                backend_timeout_s=bench.get("backend_timeout_s"),
             )
             interaction_runner.run(
                 model=trainer.get_model(),
                 X=ds["X"],
-                run_meta={"dataset": dk, "model": mk, "order": 2, "n_background": n_background, **dp},
+                run_meta={"dataset": dk, "model": mk, "order": 2, "n_background": n_background, **dp, **mp},
             )
 
     print(f"[task {args.task_id}] done -> {output_csv}")
