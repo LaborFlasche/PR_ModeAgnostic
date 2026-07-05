@@ -74,6 +74,17 @@ uv sync
 ## 3. Pre-download datasets (do this once on the login node)
 
 Compute nodes may have no outbound internet access. Cache all datasets first.
+
+To check what is already cached (never downloads anything — it blocks network
+access and reports any dataset that would need it):
+
+```bash
+uv run python scripts/check_dataset_cache.py            # all configs/*.yaml
+uv run python scripts/check_dataset_cache.py configs/config-tree.yaml
+```
+
+Exit code 0 means every dataset loads offline; 1 lists the missing ones, which
+the snippet below then downloads.
 Run once per unique `(dataset, n_features, n_samples)` combination across all
 four configs:
 

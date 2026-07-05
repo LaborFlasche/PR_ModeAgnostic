@@ -67,7 +67,10 @@ class BenchmarkRunner:
                     contrib = cls(model, background).run_explainer(X_eval)
             except BackendTimeout:
                 print(f"  [SKIP] {cls.name}: exceeded {self.backend_timeout_s}s timeout")
-                contrib = nan_result(X_eval) if cls.order == 1 else nan_interaction_result(X_eval)
+                contrib = self._nan_contrib(cls, X_eval)
+            except Exception as e:
+                print(f"  [BUG] {cls.name} crashed: {e.__class__.__name__}: {e}")
+                contrib = self._nan_contrib(cls, X_eval)
             runtime = time.perf_counter() - t0
             results.append({
                 "cls": cls,
@@ -85,7 +88,20 @@ class BenchmarkRunner:
             if self.imputer is not None:
                 run_config["imputer"] = self.imputer
             t0 = time.perf_counter()
-            contrib = cls(counter, background, run_config).run_explainer(X_eval)
+            # Same timeout + crash isolation as the true-value loop: one hung or
+            # crashing (library, approximator, budget) combination gets an
+            # all-NaN row instead of killing the whole (model, dataset) cell.
+            # A timed-out row records runtime_s ~= the timeout (right-censored)
+            # — filter NaN-value rows out of mean-runtime aggregations.
+            try:
+                with time_limit(self.backend_timeout_s):
+                    contrib = cls(counter, background, run_config).run_explainer(X_eval)
+            except BackendTimeout:
+                print(f"  [SKIP] {cls.name} ({config}): exceeded {self.backend_timeout_s}s timeout")
+                contrib = nan_result(X_eval)
+            except Exception as e:
+                print(f"  [BUG] {cls.name} ({config}) crashed: {e.__class__.__name__}: {e}")
+                contrib = nan_result(X_eval)
             runtime = time.perf_counter() - t0
             results.append({
                 "cls": cls,
@@ -101,6 +117,10 @@ class BenchmarkRunner:
             rows.append(self._row(run_meta, candidate, results))
 
         self._append_to_csv(rows)
+
+    @staticmethod
+    def _nan_contrib(cls: Type[BaseBackend], X_eval: pd.DataFrame) -> pd.DataFrame:
+        return nan_result(X_eval) if cls.order == 1 else nan_interaction_result(X_eval)
 
     def _row(self, run_meta, candidate, all_results) -> dict:
         c_contrib = candidate["contrib"]
