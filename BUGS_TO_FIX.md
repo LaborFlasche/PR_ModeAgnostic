@@ -39,19 +39,32 @@ the affected cells' values by −1 — no rerun strictly required once verified.
 
 ---
 
-## Bug 2 — shapiq_interaction disagrees with the interaction oracle 🔴
+## Bug 2 — shapiq_interaction disagrees with the interaction oracle 🟡 (by design — index mismatch)
 
 **Symptom:** `woodelf_interaction` matches the `shap_interaction` oracle essentially
 exactly (median rel MAE 0.0, rho 1.0, outside the Bug-1 cells). `shapiq_interaction`
 deviates massively: median rel MAE **0.65**, rho 0.92, never better than 0.995 across all
 441 order-2 cells.
 
-**Root cause (hypothesis):** shapiq is likely computing a budget-capped *approximate*
-interaction index (or a different index definition, e.g. k-SII) rather than exact
-TreeSHAP interaction values.
+**Root cause — CONFIRMED from code:** `ShapIQInteractionBackend`
+(`Benchmarking/backends/tree_shapiq_backend.py:55-92`) requests shapiq's
+`index="k-SII"`, which is a **different interaction index by definition** than shap's
+`shap_interaction_values` (the oracle). shapiq returns zero-diagonal pure pairwise
+terms; the backend fills the diagonal itself (`diag[i] = SV[i] − Σ_j interaction[i,j]`),
+and its docstring already documents a known ~0.03–0.08 toy-model discrepancy as
+"shapiq's own algorithm, not a bug here". So the deviation is expected — the problem is
+comparability, not broken code.
 
-**Fix:** check `ShapIQInteractionBackend`'s configuration. Until resolved, do not present
-`shapiq_interaction` as a true-value/exact backend in results.
+**Provenance:** introduced in commit `9f13aaf` ("integrated tree shap",
+`TreeIntegration` branch) — part of the **tree-backends user story**
+(`config-tree.yaml` order-2 sweep, PR #28 lineage). *Not* related to the shapiq usage
+in the NN/RQ3 user story (`ShapIQTrueValueBackend` / `shapiq_proxy`), which is a
+different backend.
+
+**Fix:** either configure shapiq to compute the same index as the oracle (e.g.
+`index="SII"`/`"STII"` if supported by `TreeExplainer`) or keep k-SII and label the
+comparison accordingly in plots/tables — but never present `shapiq_interaction` vs
+`shap_interaction` as an exactness check of the same quantity.
 
 ---
 
@@ -113,6 +126,18 @@ Runtimes of 0.1–0.6 ms show the backend never launched its subprocess.
 **Fix:** run `scripts/setup_fasttreeshap_env.sh` on the cluster (home is NFS-mounted, so
 once is enough), then rerun only the lightgbm/random_forest tree cells. All other
 backends in `results_config-tree.csv` are complete and reusable.
+
+**Status: RESOLVED (2026-07-06).** Venv provisioned on the cluster
+(`uv python install 3.10` + setup script), fasttreeshap-only repair sweep run via
+`configs/config-tree-fasttreeshap.yaml` (420 tasks), and merged back with
+`scripts/merge_fasttreeshap_repair.py` → `Benchmarking/results_config-tree-merged.csv`.
+All 714 lightgbm/random_forest rows repaired (0 NaN, no timeouts, max 4.6 s);
+xgboost's 357 rows stay NaN by design. Verified: fasttreeshap matches
+`shap_tree_path_dependent` exactly (rel MAE 0.0, rho 1.0) and the order-2 interaction
+oracle exactly; pairwise entries were recomputed in both directions (other backends'
+rows now carry real fasttreeshap metrics). Caveat: fasttreeshap's recorded runtimes
+(~2 s median) include per-call subprocess + model-pickle overhead of the out-of-process
+venv setup — don't cite them as library speed.
 
 ---
 
