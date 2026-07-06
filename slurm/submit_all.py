@@ -51,6 +51,12 @@ CONFIG_REGISTRY = {
         "config": "configs/config-tree.yaml",
         "worker": "slurm/run_benchmark.py",
     },
+    # fasttreeshap-only repair sweep (see BUGS_TO_FIX.md Bug 5); requires
+    # scripts/setup_fasttreeshap_env.sh to have been run on the cluster first.
+    "tree-fasttreeshap": {
+        "config": "configs/config-tree-fasttreeshap.yaml",
+        "worker": "slurm/run_benchmark.py",
+    },
     "nn": {
         "config": "configs/config-neural-networks-RQ3.yaml",
         "worker": "slurm/run_benchmark_nn.py",
