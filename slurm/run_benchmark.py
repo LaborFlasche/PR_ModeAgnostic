@@ -14,13 +14,11 @@ import warnings
 
 # xgboost/lightgbm must be imported before shapiq anywhere in this process, or a
 # later xgboost/lightgbm .fit() segfaults — establishes safe load order before
-# `from Benchmarking.backends import (...)` pulls in shapiq.
-import xgboost  # noqa: F401
-import lightgbm  # noqa: F401
-
-warnings.filterwarnings("ignore", message="Not all budget.*", category=UserWarning, module="shapiq")
-warnings.filterwarnings("ignore", message="The sample size is larger.*", category=UserWarning, module="shapiq")
-warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", category=UserWarning)
+# `from Benchmarking.backends import (...)` pulls in shapiq. Keep these imports
+# at the very top; do not let an import sorter move them below the Benchmarking
+# imports.
+import xgboost  # noqa: F401,E402  isort:skip
+import lightgbm  # noqa: F401,E402  isort:skip
 
 import yaml
 from sklearn.model_selection import ParameterGrid
@@ -47,8 +45,17 @@ from Benchmarking.backends import (
     FastTreeShapBackend,
     FastTreeShapInteractionBackend,
 )
-# GPUTreeShapBackend/GPUTreeShapInteractionBackend exist in Benchmarking.backends
-# for future use but aren't wired in here yet (XGBoost-only, unverified on real
+
+warnings.filterwarnings("ignore", message="Not all budget.*",
+                        category=UserWarning, module="shapiq")
+warnings.filterwarnings("ignore", message="The sample size is larger.*",
+                        category=UserWarning, module="shapiq")
+warnings.filterwarnings(
+    "ignore", message="pkg_resources is deprecated.*", category=UserWarning)
+
+
+# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in Benchmarking.backends for
+# future use but aren't wired in here yet (XGBoost-only, unverified on real
 # GPU hardware) — only woodelf's GPU=True path is wired below.
 
 APPROX_MAP = {
@@ -95,12 +102,8 @@ def build_all_runs(config_path: str) -> list[tuple]:
     as extra grid dimensions (see as_list)."""
     model_config = load_config(config_path)
     dataset_config = load_dataset_config(config_path)
-    with open(config_path) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    seeds = as_list(bench["seed"])
     model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
     dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
-    n_backgrounds = as_list(bench["n_background"])
     return [
         (seed, dk, dp, mk, mp, n_bg)
         for seed in seeds
@@ -121,7 +124,8 @@ def main():
 
     all_runs = build_all_runs(args.config)
     if args.task_id >= len(all_runs):
-        print(f"task-id {args.task_id} out of range (max {len(all_runs) - 1})", file=sys.stderr)
+        print(
+            f"task-id {args.task_id} out of range (max {len(all_runs) - 1})", file=sys.stderr)
         sys.exit(1)
 
     seed, dk, dp, mk, mp, n_background = all_runs[args.task_id]
@@ -142,7 +146,8 @@ def main():
     ]
 
     os.makedirs(args.output_dir, exist_ok=True)
-    output_csv = os.path.join(args.output_dir, f"results_{args.task_id:04d}.csv")
+    output_csv = os.path.join(
+        args.output_dir, f"results_{args.task_id:04d}.csv")
     if os.path.exists(output_csv):
         os.remove(output_csv)
 
@@ -170,8 +175,13 @@ def main():
         n_eval=bench["n_eval"],
         seed=seed,
         imputer=imputer,
-        backend_timeout_s=bench.get("backend_timeout_s"),
     )
+
+    dataset_enum = Dataset[dk.upper()]
+    ds = dataset_enum.load_dataset(**dp, seed=seed)
+    trainer = model_enum.get_model_with_params(dataset_enum, mp, seed=seed)
+    trainer.fit(ds["X"], ds["y"], task=ds["task"])
+
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],

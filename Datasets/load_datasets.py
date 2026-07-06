@@ -1,25 +1,43 @@
 """
 Dataset loading utilities for XAI library comparison.
 
-The module exposes a small registry (``DATASETS``) mapping a short key to a
-``DatasetSpec`` and a single generic ``load()`` function that performs all
-shared preprocessing (drop id columns, impute + label-encode, optional
-variance-based feature selection, optional subsampling). Backward-compatible
-``load_<name>()`` wrappers are kept so existing call sites in
-``Models/dataset_and_models.py`` and elsewhere don't have to change.
+Public surface (deliberately tiny):
 
-Every loader returns a consistent dict with:
+    Dataset            – an ``Enum`` whose members *are* the supported datasets.
+    Dataset.<X>.load() – load one dataset.
+    load(dataset)      – load one dataset (accepts a ``Dataset`` or its name str).
+    load_all(...)      – load several datasets at once.
+
+Every ``load`` returns a consistent dict:
+
     X              : pd.DataFrame  – features
     y              : pd.Series     – target
     feature_names  : list[str]
     target_name    : str
     task           : "regression" | "classification"
     name           : str
+
+The datasets are chosen to spread across three axes simultaneously — feature
+count, feature types (numeric / categorical / mixed), and domain — so that XAI
+library behaviour can be studied as those axes vary rather than as a single
+confounded "size" knob:
+
+    key            feats  task            domain      types
+    california       8    regression      housing     numeric
+    bike            12    regression      mobility    mixed
+    adult_census    14    classification  social      mixed
+    qsar_biodeg     41    classification  chemistry   numeric
+    diabetes_130    47    classification  medical     mixed
+    covertype       54    classification  ecology     numeric + binary
+    bankruptcy      64    classification  finance     numeric
+    ames            79    regression      housing     mixed
+    gisette       5000    classification  image       numeric
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Callable, Literal, Optional
 
 import numpy as np
@@ -91,8 +109,13 @@ def _binary_from_positive_label(positive_label: str) -> Callable[[pd.Series], pd
     return _tx
 
 
+def _openml(data_id: int, *, as_frame: bool = True) -> Callable[[], Any]:
+    """Zero-arg fetcher for an OpenML dataset id (used inside the registry)."""
+    return lambda: fetch_openml(data_id=data_id, as_frame=as_frame, parser="auto")
+
+
 # --------------------------------------------------------------------------- #
-# Dataset spec + registry                                                     #
+# Dataset spec                                                                #
 # --------------------------------------------------------------------------- #
 
 TargetTransform = Callable[[pd.Series], pd.Series]
@@ -100,11 +123,15 @@ TargetTransform = Callable[[pd.Series], pd.Series]
 
 @dataclass(frozen=True)
 class DatasetSpec:
-    """Declarative description of a dataset.
+    """Declarative description of a dataset — the value carried by each ``Dataset``.
 
     Attributes:
         name: Human-readable label recorded in the result dict.
         task: "regression" or "classification".
+        domain: Coarse subject area (housing, medical, ...), for spread bookkeeping.
+        feature_types: "numeric", "categorical", or "mixed" — documents the
+            categorical/continuous makeup so the benchmark set can be checked for
+            balance at a glance.
         fetch: Zero-arg callable returning an sklearn ``Bunch``.
         target: Target column name; ``None`` uses ``bunch.target_names[0]``.
         drop_columns: Columns to drop before feature/target split (e.g. "Id").
@@ -112,13 +139,14 @@ class DatasetSpec:
             (e.g. binarize ``">50K"``). If ``None``, the target is coerced to
             float for regression and to integer codes for classification.
         stratified_default_n: If set, when the caller passes ``n_samples=None``
-            the loader stratified-samples to this size (used to keep covtype
-            responsive by default).
-        dense_from_sparse: If ``True``, fetch with ``as_frame=False`` and
-            densify a sparse ARFF payload (gisette).
+            the loader stratified-samples to this size (keeps covertype responsive).
+        dense_from_sparse: If ``True``, fetch with ``as_frame=False`` and densify
+            a sparse ARFF payload (gisette).
     """
     name: str
     task: Literal["regression", "classification"]
+    domain: str
+    feature_types: Literal["numeric", "categorical", "mixed"]
     fetch: Callable[[], Any]
     target: Optional[str] = None
     drop_columns: tuple[str, ...] = ()
@@ -127,93 +155,14 @@ class DatasetSpec:
     dense_from_sparse: bool = False
 
 
-def _openml(data_id: int, *, as_frame: bool = True):
-    """Small convenience wrapper for OpenML fetchers used inside the registry."""
-    return lambda: fetch_openml(data_id=data_id, as_frame=as_frame, parser="auto")
+def _load_spec(spec: DatasetSpec, n_samples: int | None, n_features: int | None,
+               *, seed: int) -> dict:
+    """Run the shared pipeline for a single spec.
 
-
-DATASETS: dict[str, DatasetSpec] = {
-    # ---- original set --------------------------------------------------- #
-    "california": DatasetSpec(
-        name="California Housing",
-        task="regression",
-        fetch=lambda: fetch_california_housing(as_frame=True),
-    ),
-    "ames": DatasetSpec(
-        name="Ames Housing",
-        task="regression",
-        fetch=_openml(42165),
-        drop_columns=("Id",),
-    ),
-    "covertype": DatasetSpec(
-        name="Forest Covertype",
-        task="classification",
-        fetch=lambda: fetch_covtype(as_frame=True),
-        target="Cover_Type",
-        stratified_default_n=50_000,
-    ),
-    "adult_census": DatasetSpec(
-        name="Adult Census",
-        task="classification",
-        fetch=_openml(1590),
-        target_transform=_binary_from_positive_label(">50K"),
-    ),
-    "gisette": DatasetSpec(
-        name="Gisette",
-        task="classification",
-        fetch=lambda: fetch_openml(
-            data_id=41026, as_frame=False, parser="auto"),
-        dense_from_sparse=True,
-    ),
-
-    # ---- additions (Table 3) ------------------------------------------- #
-    # Small regression, TabPFN-tier — complements ames on the low end.
-    "bike": DatasetSpec(
-        name="Bike Sharing",
-        task="regression",
-        fetch=_openml(42712),
-    ),
-    # Chemical binary classification, ~41 features — new domain and fills the
-    # gap between adult_census (14) and bankruptcy (64).
-    "qsar_biodeg": DatasetSpec(
-        name="QSAR Biodegradation",
-        task="classification",
-        fetch=_openml(46952),
-    ),
-    # Financial binary classification, ~64 features — mid-large tabular.
-    "bankruptcy": DatasetSpec(
-        name="Bankruptcy",
-        task="classification",
-        fetch=_openml(46950),
-    ),
-    # Physics regression, ~81 features — the only high-dim regression benchmark
-    # in the registry (previously nothing sat between ames and gisette on the
-    # regression side).
-    "superconductivity": DatasetSpec(
-        name="Superconductivity",
-        task="regression",
-        fetch=_openml(46961),
-    ),
-}
-
-
-# --------------------------------------------------------------------------- #
-# Generic loader                                                              #
-# --------------------------------------------------------------------------- #
-
-def load(key: str, n_samples: int | None = None, n_features: int | None = None,
-         *, seed: int) -> dict:
-    """Load a registered dataset by short key.
-
-    Applies (in order): drop id columns, target extraction + transform,
-    impute + label-encode features, optional (stratified) subsample, optional
-    variance-based feature selection.
+    Order: fetch -> drop id cols -> target extraction/transform ->
+    impute + label-encode features -> optional (stratified) subsample ->
+    optional variance-based feature reduction.
     """
-    if key not in DATASETS:
-        raise KeyError(
-            f"Unknown dataset key '{key}'. Available: {sorted(DATASETS)}"
-        )
-    spec = DATASETS[key]
     bunch = spec.fetch()
 
     # ---- extract X, y ---------------------------------------------------- #
@@ -290,61 +239,147 @@ def load(key: str, n_samples: int | None = None, n_features: int | None = None,
 
 
 # --------------------------------------------------------------------------- #
-# Backwards-compatible wrappers                                               #
+# The registry: one enum member per supported dataset                         #
 # --------------------------------------------------------------------------- #
-# These preserve the historical API used across the codebase (Models,
-# tests, notebooks). Every wrapper is a one-liner over ``load()``.
 
-def _wrapper(key: str):
-    def _load(n_samples: int | None = None, n_features: int | None = None,
-              *, seed: int) -> dict:
-        return load(key, n_samples=n_samples, n_features=n_features, seed=seed)
-    _load.__name__ = f"load_{key}"
-    _load.__doc__ = f"Convenience wrapper around ``load('{key}', ...)``."
-    return _load
+class Dataset(Enum):
+    """Supported datasets. Each member's value is its :class:`DatasetSpec`.
+
+    Members are the single source of truth — there is no parallel string
+    registry or per-dataset ``load_x`` helper. Look up by name with
+    ``Dataset["ADULT_CENSUS"]`` (member names are the config keys, upper-cased).
+    """
+
+    CALIFORNIA_HOUSING = DatasetSpec(
+        name="California Housing",
+        task="regression",
+        domain="housing",
+        feature_types="numeric",
+        fetch=lambda: fetch_california_housing(as_frame=True),
+    )
+    BIKE = DatasetSpec(
+        name="Bike Sharing",
+        task="regression",
+        domain="mobility",
+        feature_types="mixed",
+        fetch=_openml(42712),
+    )
+    ADULT_CENSUS = DatasetSpec(
+        name="Adult Census",
+        task="classification",
+        domain="social",
+        feature_types="mixed",
+        fetch=_openml(1590),
+        target_transform=_binary_from_positive_label(">50K"),
+    )
+    QSAR_BIODEG = DatasetSpec(
+        name="QSAR Biodegradation",
+        task="classification",
+        domain="chemistry",
+        feature_types="numeric",
+        fetch=_openml(46952),
+    )
+    DIABETES_130 = DatasetSpec(
+        name="Diabetes 130-US",
+        task="classification",
+        domain="medical",
+        feature_types="mixed",
+        fetch=_openml(46922),
+    )
+    COVERTYPE = DatasetSpec(
+        name="Forest Covertype",
+        task="classification",
+        domain="ecology",
+        feature_types="numeric",  # numeric + native binary indicator columns
+        fetch=lambda: fetch_covtype(as_frame=True),
+        target="Cover_Type",
+        stratified_default_n=50_000,
+    )
+    BANKRUPTCY = DatasetSpec(
+        name="Bankruptcy",
+        task="classification",
+        domain="finance",
+        feature_types="numeric",
+        fetch=_openml(46950),
+    )
+    AMES_HOUSING = DatasetSpec(
+        name="Ames Housing",
+        task="regression",
+        domain="housing",
+        feature_types="mixed",
+        fetch=_openml(42165),
+        drop_columns=("Id",),
+    )
+    GISETTE = DatasetSpec(
+        name="Gisette",
+        task="classification",
+        domain="image",
+        feature_types="numeric",
+        fetch=lambda: fetch_openml(
+            data_id=41026, as_frame=False, parser="auto"),
+        dense_from_sparse=True,
+    )
+
+    # -- convenience API ---------------------------------------------------- #
+    @property
+    def spec(self) -> DatasetSpec:
+        return self.value
+
+    @property
+    def is_regression(self) -> bool:
+        return self.spec.task == "regression"
+
+    def load(self, n_samples: int | None = None, n_features: int | None = None,
+             *, seed: int) -> dict:
+        """Load this dataset. See module docstring for the returned dict shape."""
+        return _load_spec(self.spec, n_samples, n_features, seed=seed)
+
+    def __str__(self) -> str:  # nicer prints / f-strings
+        return self.spec.name
 
 
-load_california_housing = _wrapper("california")
-load_ames_housing = _wrapper("ames")
-load_covertype = _wrapper("covertype")
-load_adult_census = _wrapper("adult_census")
-load_gisette = _wrapper("gisette")
-load_bike = _wrapper("bike")
-load_qsar_biodeg = _wrapper("qsar_biodeg")
-load_bankruptcy = _wrapper("bankruptcy")
-load_superconductivity = _wrapper("superconductivity")
+# --------------------------------------------------------------------------- #
+# Module-level convenience functions                                          #
+# --------------------------------------------------------------------------- #
+
+def load(dataset: "Dataset | str", n_samples: int | None = None,
+         n_features: int | None = None, *, seed: int) -> dict:
+    """Load a single dataset, accepting a :class:`Dataset` or its name string.
+
+    ``load("adult_census", seed=42)`` and ``load(Dataset.ADULT_CENSUS, seed=42)``
+    are equivalent.
+    """
+    if isinstance(dataset, str):
+        try:
+            dataset = Dataset[dataset.upper()]
+        except KeyError:
+            raise KeyError(
+                f"Unknown dataset '{dataset}'. Available: "
+                f"{[d.name.lower() for d in Dataset]}"
+            ) from None
+    return dataset.load(n_samples, n_features, seed=seed)
 
 
-# Datasets included in the default ``load_all`` sweep. Very large or very
-# high-dimensional datasets (covertype's full 581k rows, gisette's 5k feats)
-# are excluded so smoke-testing stays cheap; call the wrappers explicitly if
-# you need them.
-DEFAULT_LOAD_ALL: tuple[str, ...] = (
-    "california",
-    "ames",
-    "covertype",
-    "adult_census",
-    "bike",
-    "qsar_biodeg",
-    "bankruptcy",
-    "superconductivity",
-)
-
-
-def load_all(*, seed: int, keys: tuple[str, ...] | None = None) -> dict[str, dict]:
-    """Load a curated set of datasets keyed by short name.
+def load_all(datasets: "list[Dataset] | None" = None, *, seed: int,
+             ) -> dict["Dataset", dict]:
+    """Load several datasets at once, keyed by :class:`Dataset` member.
 
     Args:
+        datasets: Which datasets to load. Defaults to *every* member of
+            :class:`Dataset`. Pass a subset list for a cheaper sweep, e.g.
+            ``load_all([Dataset.BIKE, Dataset.ADULT_CENSUS], seed=42)``.
         seed: Benchmark seed threaded into every subsampler.
-        keys: Optional subset of ``DATASETS`` keys. Defaults to
-            :data:`DEFAULT_LOAD_ALL` (skips gisette).
     """
-    selected = keys if keys is not None else DEFAULT_LOAD_ALL
-    return {k: load(k, seed=seed) for k in selected}
+    selected = list(datasets) if datasets is not None else list(Dataset)
+    return {d: d.load(seed=seed) for d in selected}
 
 
 if __name__ == "__main__":
-    datasets = load_all(seed=42)
-    for name, data in datasets.items():
-        print(f"{name}: {data['X'].shape[0]} samples, "
-              f"{data['X'].shape[1]} features ({data['task']})")
+    # Light smoke set (skips the 581k-row covertype and 5000-feature gisette).
+    demo = [d for d in Dataset if d not in (
+        Dataset.COVERTYPE, Dataset.GISETTE)]
+    for d, data in load_all(demo, seed=42).items():
+        s = d.spec
+        print(f"{d.name.lower():18s} {data['X'].shape[0]:>6} samples "
+              f"{data['X'].shape[1]:>4} feats  {s.task:<14} "
+              f"{s.domain:<10} {s.feature_types}")
