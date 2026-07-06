@@ -40,10 +40,14 @@ class ShapIQTrueValueBackend(BaseBackend):
             )
 
         def predict_fn(X: np.ndarray) -> np.ndarray:
+            # Must return a 1D scalar game like every other backend's value function
+            # (see marginal_predict): a 2D multiclass return would fall through to
+            # shapiq's default class_index=1, silently explaining a different class
+            # than the class-0 convention every other backend uses.
             df = pd.DataFrame(X, columns=columns)
             if hasattr(self.model, "predict_proba"):
                 out = self.model.predict_proba(df)
-                return out[:, 1] if out.shape[1] == 2 else out
+                return out[:, 1] if out.shape[1] == 2 else out[:, 0]
             return self.model.predict(df).astype(float)
 
         explainer = shapiq.TabularExplainer(
