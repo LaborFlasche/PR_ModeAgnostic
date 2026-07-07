@@ -11,7 +11,8 @@ class TorchPredictor(nn.Module):
 
     All methods (gradient-based and model-agnostic) explain the same scalar function:
 
-    * Regression       → raw output (squeezed to 1-D).
+    * Regression       → raw output (squeezed to 1-D), de-standardized to
+                         original target units when the trainer standardized y.
     * Classification   → ``P(class=target_class)`` via softmax.
                          Binary: target_class=1, multiclass: target_class=0.
                          Matches ``marginal_predict`` and ``ShapIQTrueValueBackend``.
@@ -20,22 +21,53 @@ class TorchPredictor(nn.Module):
     attributions (KernelShap, ShapIQ) directly comparable without needing a
     ``target`` neuron argument in captum.
 
+    Feature/target standardization lives *inside* ``forward`` (not in the
+    trainer's data pipeline alone) so that every explanation path — gradient
+    backends backpropagating through ``forward`` and model-agnostic backends
+    calling ``predict`` — sees the model in the original feature and output
+    space. The scaling is simply part of the explained function ``f``.
+
     Parameters
     ----------
     model : nn.Module
-        The trained PyTorch model (outputs raw logits).
+        The trained PyTorch model (outputs raw logits; expects standardized
+        inputs when ``x_mean``/``x_std`` are given).
     task : str
         ``"regression"`` or ``"classification"``.
     n_classes : int
         Number of output classes (1 for regression). Determines ``target_class``.
+    x_mean, x_std : torch.Tensor | None
+        Per-feature standardization applied before the network.
+    y_mean, y_std : torch.Tensor | None
+        Regression-target standardization undone after the network.
     """
 
-    def __init__(self, model: nn.Module, task: str = "regression", n_classes: int = 1):
+    # Max rows per forward pass in predict()/predict_proba(). Model-agnostic
+    # explainers hand over 10^5-10^6 coalition-imputed rows in one call; a
+    # single-batch forward through the transformer OOMs on 7.6 GB GPUs
+    # (attention memory is quadratic in tokens).
+    PREDICT_CHUNK = 4096
+
+    def __init__(
+        self,
+        model: nn.Module,
+        task: str = "regression",
+        n_classes: int = 1,
+        x_mean: torch.Tensor | None = None,
+        x_std: torch.Tensor | None = None,
+        y_mean: torch.Tensor | None = None,
+        y_std: torch.Tensor | None = None,
+    ):
         super().__init__()
         self.model = model
         self.task = task
         self.n_classes = n_classes
         self._target = 1 if n_classes == 2 else 0
+        # Buffers so .to(device)/state_dict handle them like weights.
+        self.register_buffer("x_mean", x_mean)
+        self.register_buffer("x_std", x_std)
+        self.register_buffer("y_mean", y_mean)
+        self.register_buffer("y_std", y_std)
 
     # ------------------------------------------------------------------
     # nn.Module interface (gradient-based backends)
@@ -43,41 +75,58 @@ class TorchPredictor(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Return a scalar per sample so gradient backends need no ``target``."""
+        if self.x_mean is not None:
+            x = (x - self.x_mean) / self.x_std
         logits = self.model(x)
         if self.task == "classification":
             return torch.softmax(logits, dim=-1)[:, self._target]
-        return logits.squeeze(-1)
+        out = logits.squeeze(-1)
+        if self.y_mean is not None:
+            out = out * self.y_std + self.y_mean
+        return out
 
     # ------------------------------------------------------------------
     # sklearn-compatible interface (model-agnostic backends)
     # ------------------------------------------------------------------
+
+    def _device(self) -> torch.device:
+        try:
+            return next(self.model.parameters()).device
+        except StopIteration:
+            return torch.device("cpu")
 
     def _to_tensor(self, X) -> torch.Tensor:
         if isinstance(X, pd.DataFrame):
             X = X.values
         if isinstance(X, np.ndarray):
             X = torch.tensor(X, dtype=torch.float32)
-        try:
-            device = next(self.model.parameters()).device
-        except StopIteration:
-            device = torch.device("cpu")
-        return X.float().to(device)
+        return X.float()
 
     @torch.no_grad()
+    def _scalar_chunked(self, X) -> np.ndarray:
+        """forward() in PREDICT_CHUNK-row slices, staging each on the model's
+        device only for its own pass, so peak memory is bounded regardless of
+        how many rows the caller sends."""
+        self.model.eval()
+        X_t = self._to_tensor(X)
+        device = self._device()
+        outs = [
+            self(X_t[i:i + self.PREDICT_CHUNK].to(device)).cpu()
+            for i in range(0, X_t.shape[0], self.PREDICT_CHUNK)
+        ]
+        return torch.cat(outs).numpy()
+
     def predict(self, X) -> np.ndarray:
         """Return the scalar output as a 1-D numpy array."""
-        self.model.eval()
-        return self(self._to_tensor(X)).cpu().numpy()
+        return self._scalar_chunked(X)
 
-    @torch.no_grad()
     def predict_proba(self, X) -> np.ndarray:
         """Return (n, 2) array of ``[1 - p, p]`` where ``p = forward(X)``.
 
         ``marginal_predict`` selects ``[:, 1]`` for ``shape[1] == 2``, so it
         receives ``P(target_class)`` — the same scalar as ``forward()``.
         """
-        self.model.eval()
-        p = self(self._to_tensor(X)).cpu().numpy()
+        p = self._scalar_chunked(X)
         return np.stack([1 - p, p], axis=1)
 
 
@@ -177,15 +226,38 @@ class PytorchTrainer(ModelTrainer):
         in_features = X_np.shape[1]
         X_t = torch.tensor(X_np, dtype=torch.float32)
 
+        # Standardize features for training: raw magnitudes up to ~1e5
+        # (adult capital-gain, ames areas) overflow the transformer's
+        # attention to NaN on the cluster. Constant features keep std=1 so
+        # they pass through unchanged. The stats go into TorchPredictor so
+        # explainers keep operating in the original feature space.
+        x_mean = X_t.mean(dim=0)
+        x_std = X_t.std(dim=0)
+        x_std = torch.where(x_std > 0, x_std, torch.ones_like(x_std))
+        X_t = (X_t - x_mean) / x_std
+
+        y_mean = y_std = None
         if task == "classification":
-            # Shift labels to 0-indexed (e.g. Covertype uses 1-7)
-            y_np = y_np - y_np.min()
+            # Remap labels to canonical 0..n_classes-1 like SklearnTrainer: a plain
+            # min-shift breaks non-consecutive labels (gisette's -1/1 became 0/2 →
+            # a 3-class head with a dead class, and TorchPredictor then explained
+            # class 0 = the negative class). Sorted-order remap keeps class 1 =
+            # the higher original label, matching predict_proba[:, 1] downstream.
+            y_np = np.unique(y_np, return_inverse=True)[1]
             out_features = int(y_np.max()) + 1
             y_t = torch.tensor(y_np, dtype=torch.long)
             loss_fn = nn.CrossEntropyLoss()
         else:
             out_features = 1
             y_t = torch.tensor(y_np, dtype=torch.float32).unsqueeze(1)
+            # Standardize the regression target too (ames y ~ 2e5 makes MSE
+            # gradients explode); TorchPredictor de-standardizes the output,
+            # so predictions stay in original target units.
+            y_mean = y_t.mean()
+            y_std = y_t.std()
+            if not y_std > 0:
+                y_std = torch.ones_like(y_std)
+            y_t = (y_t - y_mean) / y_std
             loss_fn = nn.MSELoss()
 
         module = self._build_module(in_features, out_features).to(self._device)
@@ -204,7 +276,15 @@ class PytorchTrainer(ModelTrainer):
                 loss_fn(module(X_batch), y_batch).backward()
                 optimizer.step()
 
-        self._model = TorchPredictor(module, task=task, n_classes=out_features)
+        self._model = TorchPredictor(
+            module,
+            task=task,
+            n_classes=out_features,
+            x_mean=x_mean.to(self._device),
+            x_std=x_std.to(self._device),
+            y_mean=y_mean.to(self._device) if y_mean is not None else None,
+            y_std=y_std.to(self._device) if y_std is not None else None,
+        )
         return self
 
     def get_model(self) -> TorchPredictor:

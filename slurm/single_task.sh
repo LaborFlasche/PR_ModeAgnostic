@@ -7,8 +7,9 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm/logs/task_%j.out
 #SBATCH --error=slurm/logs/task_%j.err
-# Note: NN jobs (run_benchmark_nn.py) use device=cuda from the config. If Krater
-# does not auto-assign a GPU, add --gres=gpu:1 to the sbatch call in submit_all.py
-# for entries whose worker_script is slurm/run_benchmark_nn.py.
+# Note: NN jobs (run_benchmark_nn.py) use device=cuda from the config and are
+# routed to --partition=NvidiaAll by submit_all.py. Do NOT add --gres/--gpus:
+# the CIP cluster defines no GPU GRES (sinfo: GRES=(null) everywhere) and
+# rejects those flags; the NvidiaAll nodes expose their GPU directly.
 
 ~/.local/bin/uv run python "$1" --task-id "$2" --config "$3" --output-dir "$4"

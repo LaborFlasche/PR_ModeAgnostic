@@ -25,6 +25,10 @@ dependencies = [
     "shapflow>=0.0.1",
     "torch>=2.12.0",
     "woodelf-explainer>=0.4.3",
+    # woodelf's GPU=True path needs cupy; Linux-only marker so the macOS dev
+    # env skips it (no CUDA wheels for darwin) while the cluster gets it via
+    # plain `uv sync`. Wheel bundles the CUDA 12 runtime; needs driver >= 525.
+    "cupy-cuda12x>=13.0 ; sys_platform == 'linux'",
     "xgboost>=2.0.0",
     "dalex>=1.7.2",
     "pyyaml>=6.0.3",

@@ -88,6 +88,7 @@ One row per backend per run. Key columns:
 | `n_eval` | Number of samples explained |
 | `runtime_s` | Wall-clock time for that backend |
 | `n_model_evals` | Actual rows scored by the model — the fair budget axis across libraries (NaN for the oracle) |
+| `additivity_gap`, `relative_additivity_gap` | Local-accuracy violation vs the shared value function (see Metrics) — absolute, needs no reference backend |
 | `mean_abs_diff`, `relative_mae`, `sign_agreement`, `mean_sample_rho` | Accuracy vs reference (NaN for the absolute reference) |
 | `reference_backend` | Which backend was used as ground truth |
 
@@ -104,6 +105,28 @@ All metrics compare two attribution matrices of shape `(n_samples, n_features)`.
 **`sign_agreement`** — Fraction of (sample, feature) pairs where both methods agree on attribution direction (positive vs. negative). Zero-valued attributions are excluded from both sides before comparing. Higher = better directional agreement.
 
 **`mean_sample_rho`** — Mean Spearman rank correlation per sample. For each sample, ranks features by attribution magnitude and correlates the two rankings. Measures whether methods agree on *which features matter most*, independent of scale. Undefined (NaN) when `n_features = 1`.
+
+### Additivity metrics (local accuracy / efficiency)
+
+Shapley values satisfy the **efficiency axiom**: `E[f(X)] + Σ_j φ_ij = f(x_i)` for every
+sample — the baseline plus all attributions must reproduce the model output exactly
+(what the `shap` library calls *local accuracy* and asserts with `check_additivity`).
+The runner verifies this against the shared value function: `baseline` is the mean of
+`marginal_predict` over the shared background, and both metrics are recorded per backend
+row, no reference backend involved.
+
+**`additivity_gap`** — Mean |f(x_i) − (baseline + Σ_j φ_ij)| over the evaluation samples,
+in model-output units. 0 = the property holds exactly. ~0 does not mean the values are
+correct: exact methods and constraint-enforcing approximators (KernelSHAP) satisfy it by
+construction even when per-feature values are off. A large gap proves a problem — real
+signal for gradient-based methods, backends with a different internal baseline (e.g.
+path-dependent TreeSHAP), and implementation bugs (wrong output space or background).
+
+**`relative_additivity_gap`** — `additivity_gap` divided by the mean |f(x_i) − baseline|,
+i.e. by the attribution mass the values are supposed to distribute. Dimensionless, 0 =
+perfect, so comparable across datasets like `relative_mae`. NaN when every prediction
+equals the baseline. Values ≳ 1 mean the violation is as large as the signal being
+explained — the attributions do not decompose the prediction in any meaningful sense.
 
 ---
 

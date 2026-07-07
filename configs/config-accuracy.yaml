@@ -4,7 +4,7 @@ benchmark:
   # and every stochastic approximator (shap, shapiq, lightshap, dalex), so changing
   # this one value reseeds the whole experiment reproducibly. Recorded per row in the
   # results CSV. There are no hardcoded fallback seeds anywhere downstream.
-  seed: [0,1,2,3,4,5,6,7,8,9]
+  seed: [0,1,2]
   # Number of rows used as the imputer background / reference set (defines the
   # marginal value function). Cost per explanation scales with this;
   n_background: [50, 200]
@@ -13,6 +13,10 @@ benchmark:
   # hundred points, so a small value keeps representativeness while cutting runtime
   # drastically. Use null to explain every remaining row.
   n_eval: 10
+  # Wall-clock budget per backend run (true-value AND each approximation spec);
+  # a backend exceeding this logs a [SKIP] and gets an all-NaN row instead of
+  # stalling the whole cell. null = no timeout.
+  backend_timeout_s: 600
   # Approximation sweep: only the selected (library × approximator × budget)
   # combinations are run. Budget units differ across libraries — the recorded
   # n_model_evals is the comparable axis.

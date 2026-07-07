@@ -25,7 +25,7 @@ benchmark:
   # shapiq uses ShapIQTrueValueBackend (TabularExplainer with auto-selected
   # approximator, no explicit approximator sweep).
   nn_true_value_libraries: [shapiq]
-  device: cuda # cuda for GPU and cpu for CPU.
+  device: cpu # cuda for GPU and cpu for CPU.
 
 models:
   mlp:
