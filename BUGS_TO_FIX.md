@@ -16,7 +16,7 @@ Overall status per sweep:
 
 ---
 
-## Bug 1 — woodelf returns sign-flipped Shapley values for random_forest classifiers 🔴
+## Bug 1 — woodelf returns sign-flipped Shapley values for random_forest classifiers 🔴 - NOT FIXABLE (ASK MAX)
 
 **Symptom:** 147/630 `woodelf_interventional` order-1 cells have `relative_mae ≈ 2.0` and
 `mean_sample_rho = −1.0` vs the oracle. Affected cells are exactly
@@ -39,7 +39,7 @@ the affected cells' values by −1 — no rerun strictly required once verified.
 
 ---
 
-## Bug 2 — shapiq_interaction disagrees with the interaction oracle 🟡 (by design — index mismatch)
+## Bug 2 — shapiq_interaction disagrees with the interaction oracle 🟡 (by design — index mismatch) - NOT FIXABLE (ASK MAX)
 
 **Symptom:** `woodelf_interaction` matches the `shap_interaction` oracle essentially
 exactly (median rel MAE 0.0, rho 1.0, outside the Bug-1 cells). `shapiq_interaction`
@@ -68,7 +68,7 @@ comparison accordingly in plots/tables — but never present `shapiq_interaction
 
 ---
 
-## Bug 3 — silent `except` swallows DeepExplainer errors in shap_nn backend 🟡
+## Bug 3 — silent `except` swallows DeepExplainer errors in shap_nn backend 🟡 - NOT FIXABLE (DeepExplainer does not support Transformer)
 
 **Location:** `Benchmarking/backends/shap_nn_backend.py:83-84`
 
@@ -90,7 +90,7 @@ before returning the NaN frame.
 
 ---
 
-## Bug 4 — accuracy sweep: systematic error floor at n_background=200 🟡
+## Bug 4 — accuracy sweep: systematic error floor at n_background=200 🟡 - INVESTIGATE FURTHER
 
 **Symptom:** at `n_background=50`, approximation error behaves like sampling noise
 (shrinks sharply with budget, e.g. shapiq-kernel 0.073 → 0.000 going 64 → 512). At
@@ -107,7 +107,7 @@ background set internally (e.g. at 100 rows) while the oracle uses all 200.
 
 ---
 
-## Bug 5 — fasttreeshap produced zero usable data in the tree sweep 🟡
+## Bug 5 — fasttreeshap produced zero usable data in the tree sweep 🟡 - FIXED (RUN WITH OWN VENV)
 
 **Symptom:** all 1071 fasttreeshap rows (630 order-1 + 441 order-2) are all-NaN.
 Runtimes of 0.1–0.6 ms show the backend never launched its subprocess.
@@ -141,30 +141,6 @@ venv setup — don't cite them as library speed.
 
 ---
 
-## Bug 6 — NN results CSV is stale (wrong config generation) 🔴
-
-**Symptom:** every row of `results_config-neural-networks-RQ3.csv` has
-`seed=42, n_background=200` — the original config from commit `8cd8b3c`. The current
-config (`seed: [0,1,2]`, `n_background: 100`, `backend_timeout_s: 3600`) defines a
-27-cell grid of which **0 cells are present**.
-
-Additional defects of that old run:
-- `gisette × transformer` cell missing entirely — the run predated `backend_timeout_s`
-  and slow cells ran for hours (lightshap-kernel on gisette-mlp: 17,109 s;
-  shapiq reference on ames-transformer: 7,039 s) → almost certainly killed by the 12 h
-  SLURM walltime before writing its CSV.
-- 10/72 rows all-NaN (`shap_nn deep` in 7/8 cells, `captum deep_lift_shap` on both
-  transformer cells + gisette-cnn_1d). Only the transformer failures reproduce with the
-  current environment (see Bug 3); the rest were older library versions on the cluster.
-
-**Fix:** full rerun via `uv run python slurm/submit_all.py --configs nn` (after clearing
-`Benchmarking/slurm_results/config-neural-networks-RQ3/`). Requires the GRES fix (Bug 7).
-
-**Status: RESOLVED (2026-07-06 rerun).** New CSV covers all 27 cells (seeds 0–2,
-n_background 100, 9 backend rows each). Remaining problems are Bug 9 (transformer) and
-the expected Bug-3 `shap_nn deep` failures.
-
----
 
 ## Bug 9 — rerun: the transformer model breaks nearly every backend, including the reference 🔴
 
