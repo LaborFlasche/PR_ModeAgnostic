@@ -7,17 +7,17 @@ A curated set of tabular datasets used to evaluate XAI libraries. They are chose
 The whole module is one enum. Each `Dataset` member _is_ a supported dataset, and its value is a `DatasetSpec` describing how to fetch and preprocess it. There is **no** parallel string registry and **no** per-dataset `load_x()` helper — the previous design had both and it was redundant.
 
 ```python
-from Datasets.load_datasets import Dataset, load, load_all
+from Datasets.load_datasets import Dataset, load_dataset, load_all_datasets
 
 # load one, via the enum member …
-ds = Dataset.ADULT_CENSUS.load(n_samples=1_000, n_features=8, seed=42)
+ds = Dataset.ADULT_CENSUS.load_dataset(n_samples=1_000, n_features=8, seed=42)
 
 # … or via its name (config key), whichever is terser at the call site
-ds = load("adult_census", seed=42)
+ds = load_dataset("adult_census", seed=42)
 
 # load several (defaults to every member)
-all_data = load_all(seed=42)                                  # dict[Dataset, dict]
-subset   = load_all([Dataset.BIKE, Dataset.DIABETES_130], seed=42)
+all_data = load_all_datasets(seed=42)                         # dict[Dataset, dict]
+subset   = load_all_datasets([Dataset.BIKE, Dataset.DIABETES_130], seed=42)
 ```
 
 Every load returns a `dict` with keys: `name`, `task`, `X` (DataFrame), `y` (Series), `feature_names`, `target_name`.
@@ -131,7 +131,7 @@ NIPS 2003 feature-selection challenge: 5 000 pixel-derived integer features dist
 
 ## Preprocessing pipeline
 
-`Dataset.load()` (implemented by the shared `_load_spec`) applies, in order:
+`Dataset.load_dataset()` (implemented by the shared `_load_spec`) applies, in order:
 
 1. **fetch** the raw `Bunch` (`DatasetSpec.fetch`),
 2. **drop** id columns (`drop_columns`, e.g. Ames' `Id`),

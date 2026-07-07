@@ -3,10 +3,10 @@ Dataset loading utilities for XAI library comparison.
 
 Public surface (deliberately tiny):
 
-    Dataset            – an ``Enum`` whose members *are* the supported datasets.
-    Dataset.<X>.load() – load one dataset.
-    load(dataset)      – load one dataset (accepts a ``Dataset`` or its name str).
-    load_all(...)      – load several datasets at once.
+    Dataset                     – an ``Enum`` whose members *are* the supported datasets.
+    Dataset.<X>.load_dataset()  – load one dataset.
+    load_dataset(dataset)       – load one dataset (accepts a ``Dataset`` or its name str).
+    load_all_datasets(...)      – load several datasets at once.
 
 Every ``load`` returns a consistent dict:
 
@@ -329,8 +329,8 @@ class Dataset(Enum):
     def is_regression(self) -> bool:
         return self.spec.task == "regression"
 
-    def load(self, n_samples: int | None = None, n_features: int | None = None,
-             *, seed: int) -> dict:
+    def load_dataset(self, n_samples: int | None = None, n_features: int | None = None,
+                     *, seed: int) -> dict:
         """Load this dataset. See module docstring for the returned dict shape."""
         return _load_spec(self.spec, n_samples, n_features, seed=seed)
 
@@ -342,12 +342,12 @@ class Dataset(Enum):
 # Module-level convenience functions                                          #
 # --------------------------------------------------------------------------- #
 
-def load(dataset: "Dataset | str", n_samples: int | None = None,
-         n_features: int | None = None, *, seed: int) -> dict:
+def load_dataset(dataset: "Dataset | str", n_samples: int | None = None,
+                 n_features: int | None = None, *, seed: int) -> dict:
     """Load a single dataset, accepting a :class:`Dataset` or its name string.
 
-    ``load("adult_census", seed=42)`` and ``load(Dataset.ADULT_CENSUS, seed=42)``
-    are equivalent.
+    ``load_dataset("adult_census", seed=42)`` and
+    ``load_dataset(Dataset.ADULT_CENSUS, seed=42)`` are equivalent.
     """
     if isinstance(dataset, str):
         try:
@@ -357,28 +357,28 @@ def load(dataset: "Dataset | str", n_samples: int | None = None,
                 f"Unknown dataset '{dataset}'. Available: "
                 f"{[d.name.lower() for d in Dataset]}"
             ) from None
-    return dataset.load(n_samples, n_features, seed=seed)
+    return dataset.load_dataset(n_samples, n_features, seed=seed)
 
 
-def load_all(datasets: "list[Dataset] | None" = None, *, seed: int,
-             ) -> dict["Dataset", dict]:
+def load_all_datasets(datasets: "list[Dataset] | None" = None, *, seed: int,
+                      ) -> dict["Dataset", dict]:
     """Load several datasets at once, keyed by :class:`Dataset` member.
 
     Args:
         datasets: Which datasets to load. Defaults to *every* member of
             :class:`Dataset`. Pass a subset list for a cheaper sweep, e.g.
-            ``load_all([Dataset.BIKE, Dataset.ADULT_CENSUS], seed=42)``.
+            ``load_all_datasets([Dataset.BIKE, Dataset.ADULT_CENSUS], seed=42)``.
         seed: Benchmark seed threaded into every subsampler.
     """
     selected = list(datasets) if datasets is not None else list(Dataset)
-    return {d: d.load(seed=seed) for d in selected}
+    return {d: d.load_dataset(seed=seed) for d in selected}
 
 
 if __name__ == "__main__":
     # Light smoke set (skips the 581k-row covertype and 5000-feature gisette).
     demo = [d for d in Dataset if d not in (
         Dataset.COVERTYPE, Dataset.GISETTE)]
-    for d, data in load_all(demo, seed=42).items():
+    for d, data in load_all_datasets(demo, seed=42).items():
         s = d.spec
         print(f"{d.name.lower():18s} {data['X'].shape[0]:>6} samples "
               f"{data['X'].shape[1]:>4} feats  {s.task:<14} "

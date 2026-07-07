@@ -115,7 +115,7 @@ def generate_trained_models(config_path: str, datasets=None) -> list:
 
         for params in ParameterGrid(param_grid):
             for dataset in datasets:
-                data = dataset.load(seed=seed)
+                data = dataset.load_dataset(seed=seed)
                 trainer = model_enum.get_model_with_params(
                     dataset, params, seed=seed)
                 trainer.fit(data['X'], data['y'], task=data['task'])

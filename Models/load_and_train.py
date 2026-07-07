@@ -23,7 +23,7 @@ class TrainingConfig:
         subsampling and every estimator's ``random_state`` (config.yaml ->
         benchmark.seed), so data and model can never diverge.
         """
-        data = self.dataset.load(seed=seed)
+        data = self.dataset.load_dataset(seed=seed)
         trainer = self.model.get_model_with_params(self.dataset, {}, seed=seed)
         trainer.fit(data["X"], data["y"], task=data["task"])
         if verbose:
