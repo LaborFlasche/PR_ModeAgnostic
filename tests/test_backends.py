@@ -1,3 +1,8 @@
+# Must precede any shapiq import (incl. transitively via the shapiq_backend import
+# below), or a later xgboost/lightgbm .fit() segfaults — see run_benchmark.py.
+import xgboost  # noqa: F401
+import lightgbm  # noqa: F401
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -87,9 +92,15 @@ def test_tree_backend_shape_and_columns(toy_rf, backend_cls):
     assert list(contrib.columns) == ["f0", "f1", "f2"]
 
 
-def test_woodelf_skips_multiclass(toy_rf):
-    model, X = toy_rf
-    model.objective = "multi:softmax"  # simulate a multiclass model
+def test_woodelf_skips_multiclass():
+    # lightgbm multiclass specifically: confirmed a genuine upstream woodelf bug
+    # (see _woodelf_multiclass_unsupported), unlike sklearn-native multiclass
+    # classifiers, which are NOT skipped since they're confirmed to work correctly.
+    rng = np.random.default_rng(42)
+    X = pd.DataFrame(rng.random((60, 3)), columns=["f0", "f1", "f2"])
+    y = rng.integers(0, 3, 60)
+    model = lightgbm.LGBMClassifier(n_estimators=5, max_depth=3, verbosity=-1, random_state=42)
+    model.fit(X, y)
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]
     backend = WoodelfTreePathDependentBackend(model, background)
@@ -168,14 +179,35 @@ def test_interaction_backend_shape_and_columns(toy_rf, backend_cls):
     assert list(contrib.columns) == [f"{a}__{b}" for a in X.columns for b in X.columns]
 
 
-def test_woodelf_interaction_skips_multiclass(toy_rf):
-    model, X = toy_rf
-    model.objective = "multi:softmax"
+def test_woodelf_interaction_skips_multiclass():
+    # See test_woodelf_skips_multiclass: lightgbm multiclass is genuinely
+    # unsupported, sklearn-native multiclass is not.
+    rng = np.random.default_rng(42)
+    X = pd.DataFrame(rng.random((60, 3)), columns=["f0", "f1", "f2"])
+    y = rng.integers(0, 3, 60)
+    model = lightgbm.LGBMClassifier(n_estimators=5, max_depth=3, verbosity=-1, random_state=42)
+    model.fit(X, y)
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]
     contrib = WoodelfInteractionBackend(model, background).run_explainer(X_eval)
     assert contrib.shape == (5, 9)
     assert contrib.isna().all().all()
+
+
+def test_woodelf_runs_sklearn_multiclass():
+    """sklearn-native multiclass classifiers are the one case NOT skipped —
+    confirmed to agree with the oracle's own multiclass (class-0) convention."""
+    from sklearn.ensemble import RandomForestClassifier
+
+    rng = np.random.default_rng(42)
+    X = pd.DataFrame(rng.random((150, 3)), columns=["f0", "f1", "f2"])
+    y = rng.integers(0, 3, 150)
+    model = RandomForestClassifier(n_estimators=20, max_depth=4, random_state=42)
+    model.fit(X, y)
+    background = X.iloc[:100]
+    X_eval = X.iloc[100:110]
+    contrib = WoodelfTreePathDependentBackend(model, background).run_explainer(X_eval)
+    assert not contrib.isna().all().all()
 
 
 # --- Axiom/correctness regression tests --------------------------------------
@@ -246,7 +278,7 @@ def test_shapiq_interaction_self_consistent(toy_rf):
 
     import shapiq
     explainer = shapiq.TreeExplainer(
-        model, mode="pathdependent", max_order=2, min_order=1, index="k-SII", class_index=class_index,
+        model, mode="pathdependent", max_order=2, min_order=1, index="SII", class_index=class_index,
     )
     results = explainer.explain_X(X_eval.values, n_jobs=1)
     sv_byproduct = np.stack([np.asarray(iv.get_n_order_values(1)).ravel() for iv in results])
@@ -254,6 +286,19 @@ def test_shapiq_interaction_self_consistent(toy_rf):
     interactions = ShapIQInteractionBackend(model, background).run_explainer(X_eval).to_numpy().reshape(len(X_eval), d, d)
     row_sums = interactions.sum(axis=2)
     np.testing.assert_allclose(row_sums, sv_byproduct, atol=1e-10)
+
+
+def test_shapiq_interaction_matches_oracle(toy_rf):
+    """shapiq's SII, after ShapIQInteractionBackend's /2 symmetric-split
+    correction, computes the exact same quantity as shap's shap_interaction_values
+    (the order-2 oracle) — not just a "closer" index, an exact match. See
+    ShapIQInteractionBackend's docstring for the factor-of-2 root cause."""
+    model, X = toy_rf
+    background = X.iloc[:10]
+    X_eval = X.iloc[10:15]
+    shap_vals = ShapInteractionBackend(model, background).run_explainer(X_eval).to_numpy()
+    shapiq_vals = ShapIQInteractionBackend(model, background).run_explainer(X_eval).to_numpy()
+    np.testing.assert_allclose(shapiq_vals, shap_vals, atol=1e-6)
 
 
 # --- GPU-gated backends: skip-path only (no CUDA on this machine) -----------

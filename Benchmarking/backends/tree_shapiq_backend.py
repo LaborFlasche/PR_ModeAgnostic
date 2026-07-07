@@ -53,16 +53,33 @@ class ShapIQTreeInterventionalBackend(_ShapIQTreeBackend):
 
 
 class ShapIQInteractionBackend(BaseBackend):
-    """Pairwise (order-2, k-SII) shapiq interactions, path-dependent only
+    """Pairwise (order-2, SII) shapiq interactions, path-dependent only
     (interventional order-1 already crashes unreliably; assume order-2 does too).
 
-    shapiq's get_n_order_values(2) is zero-diagonal (pure pairwise terms), unlike
-    shap/woodelf which fold the remaining main effect onto the diagonal so a
-    row sums to the first-order value. Filled in here the same way:
-    diag[i] = SV[i] - sum_{j!=i} interaction[i,j], using the order-1 byproduct
-    of this same call — note that differs slightly (~0.03-0.08 on a toy model)
-    from a separately-requested max_order=1 SV call; that's shapiq's own
-    algorithm, not a bug here.
+    Uses index="SII" (not shapiq's own default of "k-SII"): SII is the classical
+    Shapley Interaction Index shap's shap_interaction_values (the order-2 oracle)
+    also computes — they're the same quantity by definition, and (after the /2
+    below) now agree exactly (mean_abs_diff ~0.0 on a toy model), confirming this
+    is a real bug fix, not just a closer index label. k-SII is a genuinely
+    different, efficiency-corrected index and was never expected to match.
+
+    Two corrections vs. shapiq's raw output are needed to recover shap's
+    convention:
+      1. shapiq's get_n_order_values(2) returns the FULL (unhalved) interaction
+         value in both (i, j) and (j, i); shap splits it symmetrically, storing
+         HALF in each of the two cells (so the pair's total effect is
+         cell[i,j] + cell[j,i], each equal). Confirmed empirically: every
+         off-diagonal cell of shapiq's raw matrix was exactly 2x shap's — not an
+         approximate ratio, a fixed factor. Divide by 2 before anything else.
+      2. shapiq's diagonal is zero (pure pairwise terms only), unlike shap/
+         woodelf which fold the remaining main effect onto the diagonal so a row
+         sums to the first-order value. Filled in the same way:
+         diag[i] = SV[i] - sum_{j!=i} interaction[i,j] (using the already-halved
+         off-diagonal values), from the order-1 byproduct of this same call —
+         which, with index="SII", now also matches shap's SV exactly (unlike
+         k-SII's byproduct, which the previous version of this docstring noted
+         differed by ~0.03-0.08 on a toy model; that discrepancy doesn't occur
+         with SII).
     """
 
     name = "shapiq_interaction"
@@ -78,13 +95,13 @@ class ShapIQInteractionBackend(BaseBackend):
             mode="pathdependent",
             max_order=2,
             min_order=1,
-            index="k-SII",
+            index="SII",
             class_index=class_index,
         )
         results = explainer.explain_X(x.values, n_jobs=1)
         matrices = []
         for iv in results:
-            m2 = np.asarray(iv.get_n_order_values(2))
+            m2 = np.asarray(iv.get_n_order_values(2)) / 2.0
             sv = np.asarray(iv.get_n_order_values(1))
             np.fill_diagonal(m2, sv - m2.sum(axis=1))
             matrices.append(m2)
