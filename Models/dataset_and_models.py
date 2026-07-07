@@ -43,7 +43,6 @@ class Model(Enum):
     LIGHTGBM = "lightgbm"
 
     # 3) Neuronale Netzwerke (PyTorch)
-    PYTORCH_NEURAL_NETWORK = "pytorch_neural_network"
     # Config-driven architectures (config-neural-networks-RQ3.yaml); values match
     # PytorchTrainer._ARCH_REGISTRY keys so architecture=self.value dispatches.
     MLP = "mlp"
@@ -53,7 +52,6 @@ class Model(Enum):
     @property
     def is_nn(self) -> bool:
         return self in {
-            Model.PYTORCH_NEURAL_NETWORK,
             Model.MLP,
             Model.TRANSFORMER,
             Model.CNN_1D,
@@ -153,6 +151,6 @@ class Model(Enum):
     @staticmethod
     def get_models(pytorch: bool = False) -> list:
         if pytorch:
-            return [Model.PYTORCH_NEURAL_NETWORK]
+            return [model for model in Model if model.is_nn]
         else:
             return [model for model in Model if not model.is_nn]
