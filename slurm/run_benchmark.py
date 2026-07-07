@@ -175,6 +175,7 @@ def main():
         n_eval=bench["n_eval"],
         seed=seed,
         imputer=imputer,
+        backend_timeout_s=bench.get("backend_timeout_s"),
     )
 
     dataset_enum = Dataset[dk.upper()]

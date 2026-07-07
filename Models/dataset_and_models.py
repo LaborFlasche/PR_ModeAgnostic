@@ -140,11 +140,6 @@ class Model(Enum):
                 model = LGBMClassifier(**{**base_lgbm, **params})
             return SklearnTrainer(model)
 
-        elif self == Model.PYTORCH_NEURAL_NETWORK:
-            # Legacy alias for a default-MLP PytorchTrainer; seeded via the
-            # benchmark seed like everything else.
-            return PytorchTrainer(seed=seed, **params)
-
         elif self in (Model.MLP, Model.TRANSFORMER, Model.CNN_1D):
             # PytorchTrainer seeds torch itself (no sklearn random_state);
             # epochs/lr/batch_size/device are named kwargs, architecture-specific
@@ -160,4 +155,4 @@ class Model(Enum):
         if pytorch:
             return [Model.PYTORCH_NEURAL_NETWORK]
         else:
-            return [model for model in Model if model != Model.PYTORCH_NEURAL_NETWORK]
+            return [model for model in Model if not model.is_nn]
