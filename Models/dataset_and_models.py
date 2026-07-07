@@ -69,57 +69,6 @@ class Model(Enum):
             Model.LIGHTGBM,
         }
 
-    def get_model(self, dataset: Dataset):
-        is_reg = dataset.is_regression
-
-        if self == Model.LINEAR_BASELINE:
-            model = LinearRegression() if is_reg else LogisticRegression(
-                max_iter=1000, random_state=42)
-            return SklearnTrainer(model)
-
-        elif self == Model.LINEAR_REGULARIZED:
-            model = Ridge(random_state=42) if is_reg else LogisticRegression(
-                C=0.1, max_iter=1000, random_state=42)
-            return SklearnTrainer(model)
-
-        elif self == Model.DECISION_TREE:
-            model = DecisionTreeRegressor(
-                random_state=42) if is_reg else DecisionTreeClassifier(random_state=42)
-            return SklearnTrainer(model)
-
-        elif self == Model.RANDOM_FOREST:
-            model = RandomForestRegressor(
-                random_state=42) if is_reg else RandomForestClassifier(random_state=42)
-            return SklearnTrainer(model)
-
-        elif self == Model.GRADIENT_BOOSTING:
-            model = HistGradientBoostingRegressor(
-                random_state=42) if is_reg else HistGradientBoostingClassifier(random_state=42)
-            return SklearnTrainer(model)
-
-        elif self == Model.XGBOOST:
-            from xgboost import XGBRegressor, XGBClassifier
-            # enable_categorical defaults to True in xgboost>=3.0, which makes shap's
-            # TreeExplainer reject the model outright.
-            model = XGBRegressor(random_state=42, enable_categorical=False) if is_reg else XGBClassifier(
-                random_state=42, enable_categorical=False)
-            return SklearnTrainer(model)
-
-        elif self == Model.LIGHTGBM:
-            from lightgbm import LGBMRegressor, LGBMClassifier
-            model = LGBMRegressor(
-                random_state=42, verbosity=-1) if is_reg else LGBMClassifier(random_state=42, verbosity=-1)
-            return SklearnTrainer(model)
-
-        elif self == Model.PYTORCH_NEURAL_NETWORK:
-            return PytorchTrainer()
-
-        elif self in (Model.MLP, Model.TRANSFORMER, Model.CNN_1D):
-            return PytorchTrainer(architecture=self.value)
-
-        else:
-            raise ValueError(f"Unknown model: {self.value}")
-
     def get_model_with_params(self, dataset: Dataset, params: dict, seed: int):
         is_reg = dataset.is_regression
         # random_state for every estimator comes from the benchmark seed (config.yaml ->
@@ -146,8 +95,10 @@ class Model(Enum):
                 # silently dropped by filtering against LogisticRegression's accepted parameter names.
                 valid = set(LogisticRegression().get_params())
                 filtered = {k: v for k, v in params.items() if k in valid}
+                # C=0.1 is the built-in "regularized" default (distinguishes this
+                # from LINEAR_BASELINE's C=1.0); config-supplied C overrides it.
                 model = LogisticRegression(
-                    **{**base, 'max_iter': 1000, **filtered})
+                    **{**base, 'max_iter': 1000, 'C': 0.1, **filtered})
             return SklearnTrainer(model)
 
         elif self == Model.DECISION_TREE:
@@ -188,6 +139,11 @@ class Model(Enum):
             else:
                 model = LGBMClassifier(**{**base_lgbm, **params})
             return SklearnTrainer(model)
+
+        elif self == Model.PYTORCH_NEURAL_NETWORK:
+            # Legacy alias for a default-MLP PytorchTrainer; seeded via the
+            # benchmark seed like everything else.
+            return PytorchTrainer(seed=seed, **params)
 
         elif self in (Model.MLP, Model.TRANSFORMER, Model.CNN_1D):
             # PytorchTrainer seeds torch itself (no sklearn random_state);

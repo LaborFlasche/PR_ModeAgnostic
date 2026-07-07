@@ -17,9 +17,14 @@ class TrainingConfig:
         self.model = model
 
     def train(self, seed: int, verbose: bool = False):
-        """Load the dataset and train the model. ``seed`` controls data subsampling."""
+        """Load the dataset and train the model.
+
+        ``seed`` is the single source of randomness: it drives both the dataset
+        subsampling and every estimator's ``random_state`` (config.yaml ->
+        benchmark.seed), so data and model can never diverge.
+        """
         data = self.dataset.load(seed=seed)
-        trainer = self.model.get_model()
+        trainer = self.model.get_model_with_params(self.dataset, {}, seed=seed)
         trainer.fit(data["X"], data["y"], task=data["task"])
         if verbose:
             print(f"Trained {self.model.value} on {self.dataset.value}")
