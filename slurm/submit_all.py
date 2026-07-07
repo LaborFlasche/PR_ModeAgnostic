@@ -62,11 +62,16 @@ CONFIG_REGISTRY = {
         "worker": "slurm/run_benchmark_nn.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
+    "nn-cpu": {
+        "config": "configs/config-neural-networks-RQ3-cpu.yaml",
+        "worker": "slurm/run_benchmark_nn.py",
+    },
     "tree-gpu": {
         "config": "configs/config-tree-gpu.yaml",
         "worker": "slurm/run_benchmark.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
+
 }
 
 
