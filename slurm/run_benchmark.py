@@ -102,8 +102,12 @@ def build_all_runs(config_path: str) -> list[tuple]:
     as extra grid dimensions (see as_list)."""
     model_config = load_config(config_path)
     dataset_config = load_dataset_config(config_path)
+    with open(config_path) as f:
+        bench = yaml.safe_load(f)["benchmark"]
+    seeds = as_list(bench["seed"])
     model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
     dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
+    n_backgrounds = as_list(bench["n_background"])
     return [
         (seed, dk, dp, mk, mp, n_bg)
         for seed in seeds
