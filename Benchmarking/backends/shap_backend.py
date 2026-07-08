@@ -10,18 +10,36 @@ class ShapTrueValueBackend(BaseBackend):
     library = "shap"
     computation_type = "true_value"
 
+    _EXACT_MAX_FEATURES = 14
+
+    def load_config(self):
+        if "seed" in self.config and self.config["seed"] is not None:
+            seed = self.config["seed"]
+        else:
+            raise ValueError("ShapTrueValueBackend requires a 'seed' in the config.")
+        return {
+            "random_state": seed, # seed for shap,
+            "n_background": self.config.get("n_background", 100), # number of background samples for shap
+        }
+        
+
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
-        explainer = shap.Explainer(self.model, self.background)
-        # check_additivity=False: interventional TreeSHAP on HistGradientBoosting
-        # (the gradient_boosting model) trips shap's additivity check — its binned
-        # histogram trees make shap's traversal sum mismatch the raw model output by
-        # a small margin. Only TreeExplainer runs this check; LinearExplainer and the
-        # exact path don't accept the kwarg, so fall back to the plain call there. The
-        # oracle-validation cell independently confirms the values are correct.
-        try:
-            sv = explainer(x, check_additivity=False)
-        except TypeError:
-            sv = explainer(x)
+        config = self.load_config()
+        n_features = x.shape[1]
+        if n_features > self._EXACT_MAX_FEATURES:
+            print(
+                f"  [WARN] {self.name}: n_features={n_features} > "
+                f"{self._EXACT_MAX_FEATURES} — shap.explainers.Exact enumerates all "
+                f"2^{n_features} coalitions with no budget cap; this may be "
+                "extremely slow or infeasible."
+            )
+
+        # Because shap.Exact does not take a seed argument, we seed the global RNG for reproducibility.
+        np.random.seed(config["random_state"])
+        f = marginal_predict(self.model, x.columns)
+        # Shap exact explainer needs a masker but this masker is never called because len(self.backgound ) = max_samples
+        explainer = shap.explainers.Exact(f, shap.maskers.Independent(self.background, max_samples=len(self.background)))
+        sv = explainer(x)
         values = sv.values
         if values.ndim == 3:
             # multi-class: use class 1 for binary, class 0 otherwise

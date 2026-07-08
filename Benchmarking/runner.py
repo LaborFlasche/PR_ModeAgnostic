@@ -76,11 +76,15 @@ class BenchmarkRunner:
         # --- run every backend once, record contributions and metadata ---
         results: list[dict] = []
 
+        true_value_config = {"n_background": self.n_background}
+        if self.seed is not None:
+            true_value_config["seed"] = self.seed
+
         for cls in self.true_value_backends:
             t0 = time.perf_counter()
             try:
                 with time_limit(self.backend_timeout_s):
-                    contrib = cls(model, background).run_explainer(X_eval)
+                    contrib = cls(model, background, true_value_config).run_explainer(X_eval)
             except BackendTimeout:
                 print(f"  [SKIP] {cls.name}: exceeded {self.backend_timeout_s}s timeout")
                 contrib = self._nan_contrib(cls, X_eval)
