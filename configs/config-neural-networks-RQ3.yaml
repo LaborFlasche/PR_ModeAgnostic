@@ -1,5 +1,5 @@
 benchmark:
-  seed: [0,1,2]
+  seed: [0,1,2,3,4,5,6,7,8,9]
   imputer: marginal
   n_background: 100
   n_eval: 10
@@ -54,7 +54,7 @@ models:
 # model-agnostic approximators face.
 datasets:
   ames_housing:
-    n_features: [79]
+    n_features: [30]
     n_samples: [1000]
 
   adult_census:
@@ -62,5 +62,21 @@ datasets:
     n_samples: [1000]
 
   gisette:
-    n_features: [256]
+    n_features: [30]
+    n_samples: [1000]
+
+  california_housing:
+    n_features: [8]
+    n_samples: [1000]
+
+  bike:
+    n_features: [12]
+    n_samples: [1000]
+
+  diabetes_130:
+    n_features: [30]
+    n_samples: [1000]
+
+  covertype:
+    n_features: [30]
     n_samples: [1000]
