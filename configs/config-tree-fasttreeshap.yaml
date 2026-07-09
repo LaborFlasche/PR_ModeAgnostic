@@ -11,7 +11,7 @@
 # fasttreeshap from its own rows there; the main tree CSV stays untouched.
 # Prerequisite on the cluster: bash scripts/setup_fasttreeshap_env.sh
 benchmark:
-  seed: [0,1,2]
+  seed: [0,1,2,3,4,5,6,7,8,9]
   imputer: marginal
   n_background: 100
   n_eval: 10
@@ -36,16 +36,24 @@ models:
     n_estimators: [100]
     max_depth: [4, 8, 12, 15, 20, 50, 80]
 
-# Same dataset grid as configs/config-tree.yaml.
+# Same dataset grid as configs/config.yaml.
 datasets:
-  ames_housing:
-    n_features: [4, 16, 64]
-    n_samples: [1000]
-
-  adult_census:
-    n_features: [4, 7, 14]
-    n_samples: [1000]
-
   gisette:
-    n_features: [4, 32, 256, 512]
+    n_features: [1000]
+    n_samples: [1000]
+
+  california_housing:
+    n_features: [8]
+    n_samples: [1000]
+
+  bike:
+    n_features: [12]
+    n_samples: [1000]
+
+  diabetes_130:
+    n_features: [47]
+    n_samples: [1000]
+
+  covertype:
+    n_features: [54]
     n_samples: [1000]

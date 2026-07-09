@@ -4,7 +4,7 @@ benchmark:
   # and every stochastic approximator (shap, shapiq, lightshap, dalex), so changing
   # this one value reseeds the whole experiment reproducibly. Recorded per row in the
   # results CSV. There are no hardcoded fallback seeds anywhere downstream.
-  seed: [0,1,2]
+  seed: [0,1,2,3,4,5,6,7,8,9]
   # Number of rows used as the imputer background / reference set (defines the
   # marginal value function). Cost per explanation scales with this;
   n_background: [50, 200]
@@ -70,14 +70,22 @@ models:
 # high-dimensional stress test (gisette) — without the redundant overlapping sweeps
 # that california (subset of ames) and covertype (overlaps adult) added.
 datasets:
-  ames_housing:        # regression, real-world features, up to 79 native
-    n_features: [4, 12]
+  gisette:
+    n_features: [8]
     n_samples: [1000]
 
-  adult_census:        # classification, mixed categorical/numeric, 14 native
-    n_features: [8, 12]
+  california_housing:
+    n_features: [8]
     n_samples: [1000]
 
-  gisette:             # high-dimensional stress test, capped where budget stays usable
-    n_features: [4, 14]
+  bike:
+    n_features: [8]
+    n_samples: [1000]
+
+  diabetes_130:
+    n_features: [8]
+    n_samples: [1000]
+
+  covertype:
+    n_features: [8]
     n_samples: [1000]
