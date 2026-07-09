@@ -84,7 +84,7 @@ class ShapApproxBackend(BaseBackend):
                 np.random.seed(seed)
             explainer = shap.KernelExplainer(f, self.background, silent=True)
             nsamples = budget if budget is not None else "auto"
-            values = np.asarray(explainer.shap_values(x, nsamples=nsamples, silent=True))
+            values = np.asarray(explainer.shap_values(x, nsamples=nsamples, l1_reg=False, silent=True))
         elif approximator == "permutation":
             masker = shap.maskers.Independent(self.background, max_samples=len(self.background))
             explainer = shap.PermutationExplainer(f, masker, seed=seed, silent=True)
