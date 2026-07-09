@@ -15,6 +15,7 @@ Usage (run from repo root, in a persistent session such as tmux/screen):
 Available config keys: accuracy, dimensionality, tree, nn, tree-gpu
 """
 import argparse
+import glob
 import os
 import subprocess
 import sys
@@ -199,6 +200,15 @@ def run(selected: list[str]) -> None:
         cfg = CONFIG_REGISTRY[key]["config"]
         n = count_tasks(cfg)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
+        # Start from a clean per-task output dir (same as submit.sh): workers only
+        # overwrite their own results_<task_id>.csv, so a previous sweep with a
+        # larger grid would leave higher-numbered files behind and leak stale
+        # rows into the merged CSV.
+        config_name = os.path.basename(cfg).replace(".yaml", "")
+        output_dir = os.path.join(REPO_ROOT, "Benchmarking", "slurm_results", config_name)
+        os.makedirs(output_dir, exist_ok=True)
+        for stale in glob.glob(os.path.join(output_dir, "results_*.csv")):
+            os.remove(stale)
         for task_id in range(n):
             pending.append((key, task_id))
 

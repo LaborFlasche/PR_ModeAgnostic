@@ -12,6 +12,7 @@ Usage:
 Run from the repo root so that Models/, Benchmarking/, configs/ are importable.
 """
 import argparse
+import json
 import os
 import sys
 import warnings
@@ -65,6 +66,22 @@ def build_approx_specs(bench: dict) -> list[tuple]:
         for bgt in bench["budgets"]
         if appr in getattr(APPROX_MAP[lib], "SUPPORTED_APPROXIMATORS", bench["approximators"])
     ]
+
+
+def build_run_meta(*, dataset: str, dataset_params: dict, model: str,
+                   n_background: int, device: str,
+                   model_params: dict | None = None) -> dict:
+    """Identity metadata for every CSV row of one cell. Records the device —
+    cpu and cuda sweeps of the same config are otherwise indistinguishable in
+    merged results — and flattens dataset and model params in (parity with
+    run_benchmark.py's run_meta). Non-scalar model params (e.g. mlp's
+    hidden_sizes list) are JSON-encoded so the CSV cells stay hashable for
+    merge_results.py's drop_duplicates."""
+    mp_meta = {k: json.dumps(v) if isinstance(v, (list, dict)) else v
+               for k, v in (model_params or {}).items()}
+    return {"dataset": dataset, "model": model, "order": 1,
+            "n_background": n_background, "device": device,
+            **dataset_params, **mp_meta}
 
 
 def build_all_runs(config_path: str) -> list[tuple]:
@@ -145,7 +162,9 @@ def main():
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": n_background, **dp},
+        run_meta=build_run_meta(dataset=dk, dataset_params=dp, model=mk,
+                                n_background=n_background, device=device,
+                                model_params=mp),
     )
 
     print(f"[task {args.task_id}] done -> {output_csv}")

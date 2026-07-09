@@ -27,15 +27,18 @@ def main():
 
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
 
-    # Model hyperparameters (e.g. max_depth swept in configs/config-tree.yaml) are part
-    # of the identity key too, so different values don't collapse into one row. Only
-    # included if present, since non-tree configs' models don't share these param names.
-    hyperparam_cols = [c for c in ("n_estimators", "max_depth", "learning_rate") if c in df.columns]
-    df = df.drop_duplicates(
-        subset=["dataset", "model", "n_features", "n_samples", "seed", "n_background",
-                "backend", "approximator", "budget"] + hyperparam_cols,
-        keep="last",
-    )
+    # Identity = every column that is not a per-run output. Allowlisting
+    # hyperparam columns previously collapsed runs that differed in any other
+    # swept param (min_samples_split, alpha, NN params, ...) and ignored
+    # `order`; deriving the key from the schema keeps every run_meta and sweep
+    # column in the identity automatically.
+    output_cols = {
+        "library", "computation_type", "n_eval", "runtime_s", "n_model_evals",
+        "additivity_gap", "relative_additivity_gap", "shapley_values",
+        "shapley_n_eval", "shapley_n_features", "pairwise_metrics",
+    }
+    identity_cols = [c for c in df.columns if c not in output_cols]
+    df = df.drop_duplicates(subset=identity_cols, keep="last")
 
     df.to_csv(args.output_csv, index=False)
     print(f"Merged {len(files)} files -> {len(df)} rows -> {args.output_csv}")
