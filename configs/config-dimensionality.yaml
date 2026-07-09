@@ -73,29 +73,17 @@ models:
 # that california (subset of ames) and covertype (overlaps adult) added.
 datasets:
   ames_housing:        # regression, real-world features, up to 79 native
-    n_features: [4, 16, 79]
-    n_samples: [1000]
-
-  adult_census:        # classification, mixed categorical/numeric, 14 native
-    n_features: [4, 8, 14]
+    n_features: [8,79]
     n_samples: [1000]
 
   gisette:             # high-dimensional stress test, capped where budget stays usable
-    n_features: [4, 32, 256]
-    n_samples: [1000]
-
-  california_housing:
-    n_features: [4,6,8]
-    n_samples: [1000]
-
-  bike:
-    n_features: [4,8,12]
+    n_features: [8,256]
     n_samples: [1000]
 
   diabetes_130:
-    n_features: [4,12,47]
+    n_features: [4,47]
     n_samples: [1000]
 
   covertype:
-    n_features: [4,12,54]
+    n_features: [4,54]
     n_samples: [1000]
