@@ -42,8 +42,8 @@ datasets:
     n_features: [1000]
     n_samples: [1000]
 
-  california_housing:
-    n_features: [8]
+  ames_housing:
+    n_features: [79]
     n_samples: [1000]
 
   bike:

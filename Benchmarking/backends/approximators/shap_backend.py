@@ -48,7 +48,7 @@ class ShapApproxBackend(BaseBackend):
             explainer = shap.PermutationExplainer(f, masker, seed=config["random_state"], silent=True)
             # PermutationExplainer needs at least 2*n_features+1 evals per instance;
             # if max_evals is less than that i will throw an error resulting in NaN values
-            values = np.asarray(explainer(x, max_evals=config["budget"] , silent=True).values)
+            values = np.asarray(explainer(x, max_evals=config["budget"] , l1_reg=False, silent=True).values)
         else:
             raise ValueError(f"Unknown shap approximator '{config['approximator']}' (use 'kernel' or 'permutation')")
 
