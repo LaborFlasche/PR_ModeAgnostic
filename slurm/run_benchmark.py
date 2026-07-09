@@ -208,11 +208,6 @@ def main():
         backend_timeout_s=bench.get("backend_timeout_s"),
     )
 
-    dataset_enum = Dataset[dk.upper()]
-    ds = dataset_enum.load_dataset(**dp, seed=seed)
-    trainer = model_enum.get_model_with_params(dataset_enum, mp, seed=seed)
-    trainer.fit(ds["X"], ds["y"], task=ds["task"])
-
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
