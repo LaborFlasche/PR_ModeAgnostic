@@ -54,7 +54,7 @@ models:
 # model-agnostic approximators face.
 datasets:
   ames_housing:
-    n_features: [30]
+    n_features: [79]
     n_samples: [1000]
 
   adult_census:
@@ -62,7 +62,7 @@ datasets:
     n_samples: [1000]
 
   gisette:
-    n_features: [30]
+    n_features: [1000]
     n_samples: [1000]
 
   california_housing:
@@ -74,9 +74,9 @@ datasets:
     n_samples: [1000]
 
   diabetes_130:
-    n_features: [30]
+    n_features: [47]
     n_samples: [1000]
 
   covertype:
-    n_features: [30]
+    n_features: [54]
     n_samples: [1000]

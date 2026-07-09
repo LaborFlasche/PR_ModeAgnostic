@@ -85,21 +85,18 @@ uv run python scripts/check_dataset_cache.py configs/config-tree.yaml
 
 Exit code 0 means every dataset loads offline; 1 lists the missing ones, which
 the snippet below then downloads.
-Run once per unique `(dataset, n_features, n_samples)` combination across all
-four configs:
+Run once per unique `(dataset, n_features, n_samples)` combination across
+**every** config in `configs/*.yaml` (not just the four RQ configs — this glob
+matches what `check_dataset_cache.py` checks by default, so it can't go stale
+as configs are added):
 
 ```bash
 cd ~/PR_ModeAgnostic
 uv run python - <<'EOF'
-import yaml, itertools
+import glob, yaml, itertools
 from Models.dataset_and_models import Dataset
 
-configs = [
-    "configs/config-accuracy.yaml",
-    "configs/config-dimensionality.yaml",
-    "configs/config-tree.yaml",
-    "configs/config-neural-networks-RQ3.yaml",
-]
+configs = sorted(glob.glob("configs/*.yaml"))
 seen = set()
 for cfg_path in configs:
     with open(cfg_path) as f:
@@ -119,7 +116,7 @@ for cfg_path in configs:
                 if ns is not None:
                     kw["n_samples"] = ns
                 Dataset[ds_key.upper()].load_dataset(**kw, seed=seed)
-print(f"Done — {len(seen)} unique (dataset, n_features, n_samples) combinations cached.")
+print(f"Done — {len(seen)} unique (dataset, n_features, n_samples) combinations cached across {len(configs)} configs.")
 EOF
 ```
 

@@ -18,7 +18,8 @@ benchmark:
   # blow up tree-explainer runtime, hence the cap. null = no timeout.
   backend_timeout_s: 600
   # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
-  # ShapTrueValueBackend (the oracle) still always runs regardless.
+  # No `backends` key either, so no model-agnostic true-value backend runs;
+  # only the tree-specific true-value backends below are used.
   libraries: []
   approximators: []
   budgets: []

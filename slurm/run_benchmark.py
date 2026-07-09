@@ -171,23 +171,20 @@ def main():
 
     model_enum = Model[mk.upper()]
 
-    # `backends` selects model-agnostic true-value backends directly (accuracy
-    # comparison configs); falls back to the shap oracle alone when absent.
-    # ShapTrueValueBackend must stay first when present: it's picked as the oracle.
-    backend_names = bench.get("backends")
-    if backend_names:
-        unknown = [name for name in backend_names if name not in TRUE_VALUE_BACKEND_MAP]
-        if unknown:
-            raise ValueError(
-                f"Unknown true-value backend(s) in config 'backends': {unknown} "
-                f"(known: {list(TRUE_VALUE_BACKEND_MAP)})"
-            )
-        true_value_backends = [TRUE_VALUE_BACKEND_MAP[name] for name in backend_names]
-    else:
+    # `backends` selects model-agnostic true-value backends directly — only
+    # config-accuracy.yaml sets this, to pit true-value backends against each
+    # other. Every other config omits it, so no model-agnostic true-value
+    # backend runs there; those configs rely solely on their approximation
+    # sweep (approx_specs above) and/or the tree-specific true-value backends
+    # appended below.
+    backend_names = bench.get("backends", [])
+    unknown = [name for name in backend_names if name not in TRUE_VALUE_BACKEND_MAP]
+    if unknown:
         raise ValueError(
-            "No true-value backends specified in config 'backends' — "
-            "at least one is required for the benchmark to run."
+            f"Unknown true-value backend(s) in config 'backends': {unknown} "
+            f"(known: {list(TRUE_VALUE_BACKEND_MAP)})"
         )
+    true_value_backends = [TRUE_VALUE_BACKEND_MAP[name] for name in backend_names]
     if model_enum.is_tree:
         for lib in bench.get("tree_libraries", []):
             for mode in bench.get("tree_modes", []):
