@@ -1,6 +1,6 @@
 # fasttreeshap-only repair sweep for the cells that produced all-NaN rows in
 # results_config-tree.csv (BUGS_TO_FIX.md Bug 5: the dedicated numpy<2 venv was
-# missing on the cluster). Mirrors configs/config-tree.yaml, trimmed to what
+# missing on the cluster). Mirrors configs/RQ4-tree/config-tree.yaml, trimmed to what
 # fasttreeshap can actually run:
 #   - xgboost removed: fasttreeshap 0.1.6 cannot parse XGBoost 3.x models
 #     (skipped by design, see fasttreeshap_backend.py).

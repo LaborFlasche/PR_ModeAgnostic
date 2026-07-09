@@ -167,7 +167,7 @@ backends in `results_config-tree.csv` are complete and reusable.
 
 **Status: RESOLVED (2026-07-06).** Venv provisioned on the cluster
 (`uv python install 3.10` + setup script), fasttreeshap-only repair sweep run via
-`configs/config-tree-fasttreeshap.yaml` (420 tasks), and merged back with
+`configs/RQ4-tree/config-tree-fasttreeshap.yaml` (420 tasks), and merged back with
 `scripts/merge_fasttreeshap_repair.py` → `Benchmarking/results_config-tree-merged.csv`.
 All 714 lightgbm/random_forest rows repaired (0 NaN, no timeouts, max 4.6 s);
 xgboost's 357 rows stay NaN by design. Verified: fasttreeshap matches

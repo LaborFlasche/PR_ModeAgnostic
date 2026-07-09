@@ -1,7 +1,7 @@
 import pandas as pd
 from woodelf import WoodelfExplainer
 
-from .base_backend import (
+from ..base_backend import (
     BaseBackend,
     nan_result,
     nan_interaction_result,

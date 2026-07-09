@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import shapiq
 
-from .base_backend import BaseBackend, flatten_interactions
+from ..base_backend import BaseBackend, flatten_interactions
 
 
 class _ShapIQTreeBackend(BaseBackend):
@@ -42,7 +42,7 @@ class ShapIQTreeInterventionalBackend(_ShapIQTreeBackend):
     on plain sklearn models (non-deterministically, depending on tree topology)
     against shapiq 1.5.0 + numba 0.65.1 + llvmlite 0.47.0 (macOS arm64) — not an
     import-order issue. Re-verified against shapiq 1.5.2 (same numba/llvmlite,
-    same machine) across configs/config-tree.yaml's full grid — both models,
+    same machine) across configs/RQ4-tree/config-tree.yaml's full grid — both models,
     every max_depth (4-50), every n_features (4-256) — with no hangs or
     crashes, so it's wired back in. Since the original report was
     topology-dependent, BenchmarkRunner's backend_timeout_s is the safety net

@@ -29,7 +29,7 @@ from Models.dataset_and_models import Dataset, Model
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
     ShapIQTrueValueBackend,
-    ShapIQProxyBackend,
+    ShapIQNNApproxBackend,
     CaptumApproxBackend,
     ShapNNApproxBackend,
     LightShapApproxBackend,
@@ -41,7 +41,7 @@ APPROX_MAP = {
     "shap_nn": ShapNNApproxBackend,
     "lightshap": LightShapApproxBackend,
     "dalex": DalexApproxBackend,
-    "shapiq_proxy": ShapIQProxyBackend,
+    "shapiq_proxy": ShapIQNNApproxBackend,
 }
 
 NN_TRUE_VALUE_MAP = {
@@ -53,7 +53,7 @@ def build_approx_specs(bench: dict) -> list[tuple]:
     """(backend class, config) per library × approximator × budget, filtered by
     each backend's SUPPORTED_APPROXIMATORS. An optional top-level `proxy_model`
     key ("xgboost"/"lightgbm"/"tree"/"linear") is forwarded to ProxySHAP specs
-    only — see ShapIQProxyBackend for why non-default proxies matter locally."""
+    only — see ShapIQNNApproxBackend for why non-default proxies matter locally."""
     proxy_model = bench.get("proxy_model")
     return [
         (
@@ -110,7 +110,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
-    parser.add_argument("--config", default="configs/config-neural-networks-RQ3.yaml")
+    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml")
     parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
     args = parser.parse_args()
 

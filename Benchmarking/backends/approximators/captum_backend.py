@@ -2,7 +2,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 
-from .base_backend import BaseBackend, nan_result
+from ..base_backend import BaseBackend, nan_result
 
 try:
     from captum.attr import GradientShap, DeepLiftShap

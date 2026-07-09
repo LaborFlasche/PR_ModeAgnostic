@@ -41,34 +41,34 @@ POLL_INTERVAL = 60  # seconds between squeue polls
 # necessary and sufficient; the node's GPU is directly visible to the job.
 CONFIG_REGISTRY = {
     "accuracy": {
-        "config": "configs/config-accuracy.yaml",
+        "config": "configs/RQ1-accuracy/config-accuracy.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     "dimensionality": {
-        "config": "configs/config-dimensionality.yaml",
+        "config": "configs/RQ2-dimensionality/config-dimensionality.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     "tree": {
-        "config": "configs/config-tree.yaml",
+        "config": "configs/RQ4-tree/config-tree.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     # fasttreeshap-only repair sweep (see BUGS_TO_FIX.md Bug 5); requires
     # scripts/setup_fasttreeshap_env.sh to have been run on the cluster first.
     "tree-fasttreeshap": {
-        "config": "configs/config-tree-fasttreeshap.yaml",
+        "config": "configs/RQ4-tree/config-tree-fasttreeshap.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     "nn": {
-        "config": "configs/config-neural-networks-RQ3.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml",
         "worker": "slurm/run_benchmark_nn.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
     "nn-cpu": {
-        "config": "configs/config-neural-networks-RQ3-cpu.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
     },
     "tree-gpu": {
-        "config": "configs/config-tree-gpu.yaml",
+        "config": "configs/RQ5-gpu/config-tree-gpu.yaml",
         "worker": "slurm/run_benchmark.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },

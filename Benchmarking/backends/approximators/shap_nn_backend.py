@@ -4,7 +4,7 @@ import shap
 import torch
 import torch.nn as nn
 
-from .base_backend import BaseBackend, nan_result
+from ..base_backend import BaseBackend, nan_result
 
 
 def _unwrap_torch_model(model):

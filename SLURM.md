@@ -6,10 +6,10 @@ within the Krater partition limit of **30 jobs** (15 running + 15 pending).
 
 | Config key | File | Tasks | RQ |
 |------------|------|-------|----|
-| `accuracy` | `configs/config-accuracy.yaml` | 12 | Approximation accuracy vs. background size |
-| `dimensionality` | `configs/config-dimensionality.yaml` | 36 | Scalability with feature count |
-| `tree` | `configs/config-tree.yaml` | 18 | Tree-native backends vs. model-agnostic |
-| `nn` | `configs/config-neural-networks-RQ3.yaml` | 9 | Gradient-based backends for neural networks |
+| `accuracy` | `configs/RQ1-accuracy/config-accuracy.yaml` | 12 | Approximation accuracy vs. background size |
+| `dimensionality` | `configs/RQ2-dimensionality/config-dimensionality.yaml` | 36 | Scalability with feature count |
+| `tree` | `configs/RQ4-tree/config-tree.yaml` | 18 | Tree-native backends vs. model-agnostic |
+| `nn` | `configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml` | 9 | Gradient-based backends for neural networks |
 
 ---
 
@@ -80,7 +80,7 @@ access and reports any dataset that would need it):
 
 ```bash
 uv run python scripts/check_dataset_cache.py            # all configs/*.yaml
-uv run python scripts/check_dataset_cache.py configs/config-tree.yaml
+uv run python scripts/check_dataset_cache.py configs/RQ4-tree/config-tree.yaml
 ```
 
 Exit code 0 means every dataset loads offline; 1 lists the missing ones, which
@@ -128,8 +128,8 @@ EOF
 sinfo
 ```
 
-For `configs/config.yaml` / `configs/config-tree.yaml` (CPU only) any standard
-partition works — `Krater`, `Gesteine_A`, etc. `configs/config-tree-gpu.yaml`
+For `configs/config.yaml` / `configs/RQ4-tree/config-tree.yaml` (CPU only) any standard
+partition works — `Krater`, `Gesteine_A`, etc. `configs/RQ5-gpu/config-tree-gpu.yaml`
 and the NN config need a GPU node — the `NvidiaAll` partition, targeted by
 `slurm/bench_array_gpu.sh` and `submit_all.py`'s `nn`/`tree-gpu` entries.
 
@@ -165,10 +165,10 @@ The script prints a task summary, then enters a poll loop:
 
 ```
 Config task counts:
-  accuracy         12 tasks  (configs/config-accuracy.yaml)
-  dimensionality   36 tasks  (configs/config-dimensionality.yaml)
-  tree             18 tasks  (configs/config-tree.yaml)
-  nn                9 tasks  (configs/config-neural-networks-RQ3.yaml)
+  accuracy         12 tasks  (configs/RQ1-accuracy/config-accuracy.yaml)
+  dimensionality   36 tasks  (configs/RQ2-dimensionality/config-dimensionality.yaml)
+  tree             18 tasks  (configs/RQ4-tree/config-tree.yaml)
+  nn                9 tasks  (configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml)
 
 Total: 75 tasks | MAX_JOBS=30 | poll every 60s
 ```
@@ -196,18 +196,18 @@ Use `submit.sh` when you only need one config and don't need queue throttling �
 it submits the full SLURM array in one shot:
 
 ```bash
-bash slurm/submit.sh configs/config-accuracy.yaml
-bash slurm/submit.sh configs/config-dimensionality.yaml
-bash slurm/submit.sh configs/config-tree.yaml
-bash slurm/submit.sh configs/config-neural-networks-RQ3.yaml
+bash slurm/submit.sh configs/RQ1-accuracy/config-accuracy.yaml
+bash slurm/submit.sh configs/RQ2-dimensionality/config-dimensionality.yaml
+bash slurm/submit.sh configs/RQ4-tree/config-tree.yaml
+bash slurm/submit.sh configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml
 ```
 
 > **Warning:** `submit.sh` submits all tasks at once with no concurrency limit.
 > If the task count exceeds 30, SLURM may reject the submission. Use
 > `submit_all.py` when in doubt.
 bash slurm/submit.sh                            # model-agnostic sweep (configs/config.yaml)
-bash slurm/submit.sh configs/config-tree.yaml      # tree-specific sweep
-bash slurm/submit.sh configs/config-tree-gpu.yaml  # woodelf cpu-vs-gpu sweep (needs a GPU node)
+bash slurm/submit.sh configs/RQ4-tree/config-tree.yaml      # tree-specific sweep
+bash slurm/submit.sh configs/RQ5-gpu/config-tree-gpu.yaml  # woodelf cpu-vs-gpu sweep (needs a GPU node)
 ```
 
 Run any subset — each gets its own output directory and merged CSV, so they
@@ -380,13 +380,13 @@ Re-run just that task manually to debug:
 # Model-agnostic / tree / accuracy / dimensionality configs
 uv run python slurm/run_benchmark.py \
     --task-id <TASKID> \
-    --config configs/config-accuracy.yaml \
+    --config configs/RQ1-accuracy/config-accuracy.yaml \
     --output-dir Benchmarking/slurm_results/config-accuracy
 
 # NN config
 uv run python slurm/run_benchmark_nn.py \
     --task-id <TASKID> \
-    --config configs/config-neural-networks-RQ3.yaml \
+    --config configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml \
     --output-dir Benchmarking/slurm_results/config-neural-networks-RQ3
 ```
 

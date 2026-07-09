@@ -3,7 +3,7 @@
 
 The original results_config-tree.csv has all-NaN fasttreeshap rows (the
 dedicated venv was missing on the cluster, see BUGS_TO_FIX.md Bug 5). The
-repair sweep (configs/config-tree-fasttreeshap.yaml) reran only the
+repair sweep (configs/RQ4-tree/config-tree-fasttreeshap.yaml) reran only the
 fasttreeshap backends plus the oracles. This script:
 
 1. replaces each cell's NaN fasttreeshap rows with the repaired ones,

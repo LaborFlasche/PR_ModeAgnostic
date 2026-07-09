@@ -44,7 +44,7 @@ Stored in `Datasets/`. See `Datasets/dataset.md` for full details on feature enc
 
 ## Benchmark configuration
 
-Model hyperparameters and dataset sweep ranges are defined in `configs/config.yaml` (model-agnostic) and `configs/config-tree.yaml` (tree-specific — see below). Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand either into all benchmark combinations:
+Model hyperparameters and dataset sweep ranges are defined in `configs/config.yaml` (model-agnostic) and `configs/RQ4-tree/config-tree.yaml` (tree-specific — see below). Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand either into all benchmark combinations:
 
 ```python
 from itertools import product
@@ -89,10 +89,10 @@ Features within each dataset are reduced by ranking on variance (`VarianceThresh
 Tree models (`xgboost`, `lightgbm`, and any sklearn tree model) can additionally be benchmarked against tree-specific exact/true-value SHAP backends, run via a separate config so the model-agnostic sweep above stays untouched:
 
 ```bash
-uv run python slurm/run_benchmark.py --task-id 0 --config configs/config-tree.yaml
+uv run python slurm/run_benchmark.py --task-id 0 --config configs/RQ4-tree/config-tree.yaml
 ```
 
-Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchmark.py`'s sweep against `configs/config-tree.yaml` for interactive use.
+Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchmark.py`'s sweep against `configs/RQ4-tree/config-tree.yaml` for interactive use.
 
 | Library | Modes | Order-2 interactions |
 |---|---|---|
@@ -103,11 +103,11 @@ Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchma
 
 `fasttreeshap` requires `numpy<2`, incompatible with this project's main `numpy>=2` stack, so it runs out-of-process in a dedicated venv — provision it once with `bash scripts/setup_fasttreeshap_env.sh`. It also can't parse XGBoost 3.x's model format (an upstream limitation) and is skipped for XGBoost models specifically.
 
-`shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `Benchmarking/backends/tree_shapiq_backend.py`).
+`shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `Benchmarking/backends/trees/tree_shapiq_backend.py`).
 
-GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows. XGBoost's native GPU SHAP path under the name `gputreeshap` exists in `Benchmarking/backends/` for future use but isn't wired into any config yet.
+GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/RQ5-gpu/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows. XGBoost's native GPU SHAP path under the name `gputreeshap` exists in `Benchmarking/backends/` for future use but isn't wired into any config yet.
 
-`configs/config-tree.yaml`'s `tree_libraries`/`tree_modes`/`interaction_libraries` control which of the above run; `interaction_max_features` caps interaction sweeps since their output is quadratic in feature count.
+`configs/RQ4-tree/config-tree.yaml`'s `tree_libraries`/`tree_modes`/`interaction_libraries` control which of the above run; `interaction_max_features` caps interaction sweeps since their output is quadratic in feature count.
 
 ## Setup
 
@@ -159,7 +159,7 @@ Libraries/
   dalex.ipynb             # iBreakDown, PDP, variable importance
   shapleyflow.ipynb       # Graph-based path-decomposed Shapley values
   library_merge.ipynb     # Model-agnostic sweep, interactive equivalent of run_benchmark.py
-  tree_library_merge.ipynb # Tree-specific sweep, interactive equivalent of run_benchmark.py --config configs/config-tree.yaml
+  tree_library_merge.ipynb # Tree-specific sweep, interactive equivalent of run_benchmark.py --config configs/RQ4-tree/config-tree.yaml
 Models/
   dataset_and_models.py   # Dataset and Model enums / definitions
   trainers.py             # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
