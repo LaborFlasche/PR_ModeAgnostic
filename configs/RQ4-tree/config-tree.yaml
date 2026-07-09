@@ -20,7 +20,7 @@ benchmark:
   # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
   # No `backends` key either, so no model-agnostic true-value backend runs;
   # only the tree-specific true-value backends below are used.
-  libraries: []
+  approx_backends: []
   approximators: []
   budgets: []
   # Tree-specific true-value backends, only run for tree models.

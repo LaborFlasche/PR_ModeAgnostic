@@ -10,10 +10,16 @@ benchmark:
   # a backend exceeding this logs a [SKIP] and gets an all-NaN row instead of
   backend_timeout_s: 600
 
-  # What libraries and backends to run. The backend names are the keys of the
-  # Benchmarking/backends/*.py files, and the libraries are just for logging.
-  libraries: [shap, shapiq, lightshap, dalex]
-  backends: [shap_true_value, shapiq_true_value, lightshap_exact, dalex_true_value]
+  # True value backends for the baseline results.
+  true_backends: [shap_true_value, shapiq_true_value, lightshap_exact, dalex_true_value]
+
+  # Approx backends for the approximate which are then compared to the true value backends.
+  approx_backends: [shap, shapiq, lightshap, dalex]
+  approximators: [kernel, permutation]
+  budgets: [256, 512]
+  # Value function shared by all backends so approximators and true-value
+  # backends explain the same quantity (same as the other RQ configs).
+  imputer: marginal
 
 models:
   random_forest:

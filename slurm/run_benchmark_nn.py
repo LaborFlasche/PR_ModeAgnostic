@@ -50,10 +50,13 @@ NN_TRUE_VALUE_MAP = {
 
 
 def build_approx_specs(bench: dict) -> list[tuple]:
-    """(backend class, config) per library × approximator × budget, filtered by
+    """(backend class, config) per approx_backend × approximator × budget, filtered by
     each backend's SUPPORTED_APPROXIMATORS. An optional top-level `proxy_model`
     key ("xgboost"/"lightgbm"/"tree"/"linear") is forwarded to ProxySHAP specs
     only — see ShapIQNNApproxBackend for why non-default proxies matter locally."""
+    if "libraries" in bench:
+        raise ValueError(
+            "config key 'libraries' was renamed to 'approx_backends', update the config")
     proxy_model = bench.get("proxy_model")
     return [
         (
@@ -61,7 +64,7 @@ def build_approx_specs(bench: dict) -> list[tuple]:
             {"approximator": appr, "budget": bgt}
             | ({"proxy_model": proxy_model} if proxy_model and appr == "proxy" else {}),
         )
-        for lib in bench["libraries"]
+        for lib in bench["approx_backends"]
         for appr in bench["approximators"]
         for bgt in bench["budgets"]
         if appr in getattr(APPROX_MAP[lib], "SUPPORTED_APPROXIMATORS", bench["approximators"])

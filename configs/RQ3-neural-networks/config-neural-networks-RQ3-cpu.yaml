@@ -17,7 +17,7 @@ benchmark:
   #   lightshap    -> kernel, permutation            (model-agnostic)
   #   dalex        -> permutation                    (model-agnostic)
   #   shapiq_proxy -> proxy                          (model-agnostic, ProxySHAP)
-  libraries: [captum, shap_nn, lightshap, dalex, shapiq_proxy]
+  approx_backends: [captum, shap_nn, lightshap, dalex, shapiq_proxy]
   approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation, proxy]
   budgets: [512]
   # Proxy model fitted by ProxySHAP

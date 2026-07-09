@@ -16,7 +16,7 @@ benchmark:
   n_background: 100
   n_eval: 10
   backend_timeout_s: 600
-  libraries: []
+  approx_backends: []
   approximators: []
   budgets: []
   # fasttreeshap only exists as (fasttreeshap, path_dependent) in

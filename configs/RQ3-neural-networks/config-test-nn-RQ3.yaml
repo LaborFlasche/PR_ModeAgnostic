@@ -3,7 +3,7 @@ benchmark:
   imputer: marginal
   n_background: 50
   n_eval: 5
-  libraries: [captum, shap_nn, lightshap, dalex]
+  approx_backends: [captum, shap_nn, lightshap, dalex]
   approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation]
   budgets: [64]
   nn_true_value_libraries: [shapiq]

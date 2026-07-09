@@ -18,7 +18,7 @@ benchmark:
   backend_timeout_s: 600
   # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
   # ShapTrueValueBackend (the oracle) still always runs regardless.
-  libraries: []
+  approx_backends: []
   approximators: []
   budgets: []
   # GPU-focused sweep: woodelf only, comparing its CPU (path_dependent/
