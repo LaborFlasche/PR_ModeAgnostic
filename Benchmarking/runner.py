@@ -142,6 +142,42 @@ class BenchmarkRunner:
     def _nan_contrib(cls: Type[BaseBackend], X_eval: pd.DataFrame) -> pd.DataFrame:
         return nan_result(X_eval) if cls.order == 1 else nan_interaction_result(X_eval)
 
+    @staticmethod
+    def _ref_key(result: dict) -> str:
+        """Unique key for a backend run within a cell, as a backend
+        name is not unique inside a cell: one name (e.g. "shap_approx")
+        has several runs differing by approximator + budget. Keying pairwise
+        metrics by name alone collapses them so only the last-listed run survives,
+        which both loses comparisons and turns the self-entry non-zero.
+        True-value backends carry no such config and key on the
+        name alone (e.g. "shapiq_approx|kernel|256", "shap_true_value").
+        """
+        name = result["cls"].name
+        approximator = result["config"].get("approximator")
+        budget = result["config"].get("budget")
+        parts = [name]
+        if approximator is not None:
+            parts.append(str(approximator))
+        if budget is not None:
+            parts.append(format(budget, "g") if isinstance(budget, float) else str(budget))
+        return "|".join(parts)
+
+    @staticmethod
+    def _comparable(candidate: dict, reference: dict) -> bool:
+        """Checks whether values should be compared for pairwise metrics.
+
+        A row's Shapley values are only compared against runs that share every
+        setting except the library: Any row is always compared against the exact/true-value backends (the
+        ground truth each approximation is measured against) and against itself.
+        """
+        if candidate is reference:
+            return True
+        if reference["cls"].computation_type == "true_value" or candidate["cls"].computation_type == "true_value":
+            return True
+        cand_cfg, ref_cfg = candidate["config"], reference["config"]
+        return (cand_cfg.get("approximator") == ref_cfg.get("approximator")
+                and cand_cfg.get("budget") == ref_cfg.get("budget"))
+
     def _row(self, run_meta, candidate, all_results, eval_preds, baseline) -> dict:
         c_contrib = candidate["contrib"]
         cls = candidate["cls"]
@@ -150,9 +186,18 @@ class BenchmarkRunner:
 
         pairwise = {}
         for reference in all_results:
-            ref_name = reference["cls"].name
+            # Only compare like-for-like: exact/true-value references always, and
+            # other approximations only at the same approximator+budget (see
+            # _comparable). Different-setting pairs (kernel@128 vs permutation@2048)
+            # are meaningless and skipped.
+            if not self._comparable(candidate, reference):
+                continue
+            # Key by name + config: within one cell a single backend name has
+            # several runs (approximator x budget), so keying by name alone
+            # collapses them and only the last-listed run survives.
+            ref_key = self._ref_key(reference)
             if candidate is reference:
-                pairwise[ref_name] = {
+                pairwise[ref_key] = {
                     "mean_abs_diff": 0.0,
                     "relative_mae": 0.0,
                     "sign_agreement": float(sign_agreement(c_contrib, c_contrib)),
@@ -160,7 +205,7 @@ class BenchmarkRunner:
                 }
             else:
                 r_contrib = reference["contrib"]
-                pairwise[ref_name] = {
+                pairwise[ref_key] = {
                     "mean_abs_diff": mean_abs_diff(c_contrib, r_contrib),
                     "relative_mae": relative_mae(c_contrib, r_contrib),
                     "sign_agreement": sign_agreement(c_contrib, r_contrib),
