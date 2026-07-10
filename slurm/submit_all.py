@@ -59,7 +59,7 @@ CONFIG_REGISTRY = {
         "worker": "slurm/run_benchmark.py",
     },
     "nn": {
-        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },

@@ -113,7 +113,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
-    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml")
+    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml")
     parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
     args = parser.parse_args()
 
