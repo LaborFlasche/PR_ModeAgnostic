@@ -3,8 +3,8 @@
 
 benchmark:
   seed: [0] # single seed is enough for this stress test
-  n_background: [32]
-  n_eval: 5 # lower is fine, as we do not care about accuracy here, just runtime and memory
+  n_background: [100]
+  n_eval: 10 # lower is fine, as we do not care about accuracy here, just runtime and memory
   approx_backends: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
   budgets: [2048] # high to account for the extra cost of 1000 features
@@ -20,7 +20,7 @@ models:
     # min_samples_split: [2, 5]
 
   decision_tree:
-    max_depth: [10]
+    max_depth: [null]
     # max_depth: [null, 5, 10, 20]
     min_samples_split: [2]
     # min_samples_split: [2, 5, 10]

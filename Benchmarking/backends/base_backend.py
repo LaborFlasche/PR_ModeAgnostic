@@ -15,6 +15,15 @@ class BaseBackend(ABC):
         self.model = model
         self.background = background
         self.config = config or {}
+        # Base value (empty-coalition value) of the game THIS backend explains,
+        # set by run_explainer when the library reports one. Path-dependent
+        # tree backends explain a different game than the marginal one (their
+        # base value is the cover-weighted training expectation, not the mean
+        # prediction over the background), so the runner must check additivity
+        # against this, not the shared background baseline. None = the backend
+        # explains the marginal game over the runner's background; the runner
+        # falls back to mean f(background), which is that game's base value.
+        self.baseline_: float | None = None
 
     @abstractmethod
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
@@ -31,16 +40,31 @@ def marginal_predict(model, columns):
     @model: fitted model to wrap.
     @columns: feature column names, used to rebuild a DataFrame from raw arrays.
 
-    XGBoost is detected via module name, not isinstance, to avoid importing
-    xgboost here — doing so before shapiq segfaults shapiq's interventional
-    TreeExplainer later in the process (see tree_shapiq_backend.py).
+    XGBoost/LightGBM are detected via module name, not isinstance, to avoid
+    importing them here — importing xgboost before shapiq segfaults shapiq's
+    interventional TreeExplainer later in the process (see tree_shapiq_backend.py).
+    LGBMClassifier needs the margin branch just like XGBClassifier: its leaves
+    store log-odds, so the shap oracle (and every tree backend) explains the
+    margin — but it has no decision_function, so without raw_score=True it would
+    fall through to predict_proba and the additivity metrics would compare
+    margin-space Shapley sums against probability-space predictions.
+
+    The module-name check is done on ``model._model`` when present (e.g.
+    ``CountingModel``, whose whole point is to proxy calls through so they get
+    counted) because ``type(proxy).__module__`` reflects the proxy's own class,
+    not the wrapped model's — checking the proxy directly would always miss the
+    xgboost/lightgbm branches and silently fall through to predict_proba.
     """
 
     def f(X) -> np.ndarray:
         df = X if isinstance(X, pd.DataFrame) else pd.DataFrame(np.asarray(X), columns=columns)
-        if type(model).__module__.startswith("xgboost") and hasattr(model, "predict_proba"):
+        real_model = getattr(model, "_model", model)
+        if type(real_model).__module__.startswith("xgboost") and hasattr(model, "predict_proba"):
             # XGBClassifier -> raw margin (pre-sigmoid), not probability.
             out = np.asarray(model.predict(df, output_margin=True), dtype=float)
+            return out if out.ndim == 1 else out[:, 0]
+        if type(real_model).__module__.startswith("lightgbm") and hasattr(model, "predict_proba"):
+            out = np.asarray(model.predict(df, raw_score=True), dtype=float)
             return out if out.ndim == 1 else out[:, 0]
         if hasattr(model, "decision_function"):
             # Other classifiers with a decision_function -> log-odds margin.
@@ -63,6 +87,16 @@ def marginal_predict(model, columns):
         return out
 
     return f
+
+
+def select_base_value(expected_value) -> float:
+    """Reduce a library-reported expected/base value to the scalar for the class
+    convention every backend uses (see reduce_multiclass): scalar/regression as
+    is, binary -> class 1, multiclass -> class 0."""
+    arr = np.ravel(np.asarray(expected_value, dtype=float))
+    if arr.size == 2:
+        return float(arr[1])
+    return float(arr[0])
 
 
 def nan_result(x: pd.DataFrame) -> pd.DataFrame:

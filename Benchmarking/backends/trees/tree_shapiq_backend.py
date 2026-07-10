@@ -5,6 +5,17 @@ import shapiq
 from ..base_backend import BaseBackend, flatten_interactions
 
 
+def _class_index(model) -> int:
+    """Class whose output shapiq explains: 1 for binary, 0 for multiclass,
+    matching ShapTrueValueBackend/reduce_multiclass. Counts ``classes_`` rather
+    than reading ``n_classes_``: HistGradientBoosting exposes only the former,
+    and a missing-attribute default of 2 would silently send a multiclass model
+    down the binary (class_index=1) path. Regressors (no ``classes_``) get 1,
+    which shapiq ignores for single-output models."""
+    n_classes = len(getattr(model, "classes_", ()))
+    return 1 if n_classes in (0, 2) else 0
+
+
 class _ShapIQTreeBackend(BaseBackend):
     """shapiq's tree-specific explainer (distinct from ShapIQTrueValueBackend's
     model-agnostic TabularExplainer)."""
@@ -15,8 +26,7 @@ class _ShapIQTreeBackend(BaseBackend):
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         reference_dataset = self.background.values if self.mode == "interventional" else None
-        n_classes = getattr(self.model, "n_classes_", 2)
-        class_index = 1 if n_classes == 2 else 0
+        class_index = _class_index(self.model)
         explainer = shapiq.TreeExplainer(
             self.model,
             mode=self.mode,
@@ -27,6 +37,7 @@ class _ShapIQTreeBackend(BaseBackend):
             class_index=class_index,
         )
         results = explainer.explain_X(x.values, n_jobs=1)
+        self.baseline_ = float(results[0].baseline_value)
         rows = [np.asarray(iv.get_n_order_values(1)).ravel() for iv in results]
         return pd.DataFrame(rows, index=x.index, columns=x.columns)
 
@@ -88,8 +99,7 @@ class ShapIQInteractionBackend(BaseBackend):
     order = 2
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
-        n_classes = getattr(self.model, "n_classes_", 2)
-        class_index = 1 if n_classes == 2 else 0
+        class_index = _class_index(self.model)
         explainer = shapiq.TreeExplainer(
             self.model,
             mode="pathdependent",
@@ -99,6 +109,7 @@ class ShapIQInteractionBackend(BaseBackend):
             class_index=class_index,
         )
         results = explainer.explain_X(x.values, n_jobs=1)
+        self.baseline_ = float(results[0].baseline_value)
         matrices = []
         for iv in results:
             m2 = np.asarray(iv.get_n_order_values(2)) / 2.0

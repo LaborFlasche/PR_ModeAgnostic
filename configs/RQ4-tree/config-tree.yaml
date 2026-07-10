@@ -32,6 +32,9 @@ benchmark:
   interaction_libraries: [shapiq_tree, woodelf, fasttreeshap]
   interaction_max_features: 32
 
+# max_depth below is the cap handed to the trainer (max *allowed* depth). In
+# the results CSV, the max_depth column reports the depth the fitted model
+# actually reached; the cap is recorded separately as max_depth_config.
 models:
   xgboost:
     n_estimators: [100]

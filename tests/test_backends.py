@@ -133,7 +133,9 @@ def test_model_is_tree():
     assert Model.LIGHTGBM.is_tree
     assert not Model.LINEAR_BASELINE.is_tree
     assert not Model.LINEAR_REGULARIZED.is_tree
-    assert not Model.PYTORCH_NEURAL_NETWORK.is_tree
+    assert not Model.MLP.is_tree
+    assert not Model.TRANSFORMER.is_tree
+    assert not Model.CNN_1D.is_tree
 
 
 # Duck-typed fake, not real xgboost: importing xgboost alongside shapiq's

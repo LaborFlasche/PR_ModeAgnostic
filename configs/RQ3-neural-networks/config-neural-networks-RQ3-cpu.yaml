@@ -9,7 +9,7 @@ benchmark:
   # the budget-capped shapiq reference (2^14 coalitions x n_background imputed
   # rows) is legitimately slow on the wide cells (ames 79 / gisette 256,
   # transformer). null = no timeout.
-  backend_timeout_s: 3600
+  backend_timeout_s: 1800
   # Approximation sweep (library × approximator × budget), filtered by
   # each backend's SUPPORTED_APPROXIMATORS:
   #   captum       -> gradient_shap, deep_lift_shap  (NN gradient-based)
@@ -17,20 +17,20 @@ benchmark:
   #   lightshap    -> kernel, permutation            (model-agnostic)
   #   dalex        -> permutation                    (model-agnostic)
   #   shapiq_proxy -> proxy                          (model-agnostic, ProxySHAP)
-  approx_backends: [captum, shap_nn, lightshap, dalex, shapiq_proxy]
+  approx_backends: [captum, shap_nn, lightshap, dalex, shapiq_proxy, shapiq]
   approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation, proxy]
   budgets: [512]
   # Proxy model fitted by ProxySHAP
   proxy_model: xgboost
   # shapiq uses ShapIQTrueValueBackend (TabularExplainer with auto-selected
   # approximator, no explicit approximator sweep).
-  nn_true_value_libraries: [shapiq]
+  nn_true_value_libraries: [shapiq] # TODO: Delete
   device: cpu # cuda for GPU and cpu for CPU.
 
 models:
   mlp:
     hidden_sizes: [[128, 64]]
-    epochs: [50]
+    epochs: [5]
     lr: [0.001]
     batch_size: [64]
 
@@ -38,14 +38,14 @@ models:
     d_model: [64]
     nhead: [4]
     num_layers: [2]
-    epochs: [50]
+    epochs: [5]
     lr: [0.001]
     batch_size: [64]
 
   cnn_1d:
     n_filters: [64]
     kernel_size: [3]
-    epochs: [50]
+    epochs: [5]
     lr: [0.001]
     batch_size: [64]
 
@@ -54,7 +54,7 @@ models:
 # model-agnostic approximators face.
 datasets:
   gisette:
-    n_features: [1000]
+    n_features: [100]
     n_samples: [1000]
 
   ames_housing:

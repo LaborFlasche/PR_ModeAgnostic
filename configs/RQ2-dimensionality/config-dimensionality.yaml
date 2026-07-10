@@ -23,7 +23,7 @@ benchmark:
   # n_model_evals is the comparable axis.
   approx_backends: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
-  budgets: [512]
+  budgets: [512, 1024]
   # Imputation scheme = the value function every library explains. "marginal" imputes
   # masked features from the background distribution independently of the present ones.
   # Threaded into every backend (shapiq imputer="marginal", shap Independent masker /
@@ -44,7 +44,7 @@ models:
     # min_samples_split: [2, 5]
 
   decision_tree:
-    max_depth: [10]
+    max_depth: [null]
     # max_depth: [null, 5, 10, 20]
     min_samples_split: [2]
     # min_samples_split: [2, 5, 10]
@@ -73,17 +73,17 @@ models:
 # that california (subset of ames) and covertype (overlaps adult) added.
 datasets:
   ames_housing:        # regression, real-world features, up to 79 native
-    n_features: [8,79]
+    n_features: [14,32,79]
     n_samples: [1000]
 
   gisette:             # high-dimensional stress test, capped where budget stays usable
-    n_features: [8,256]
+    n_features: [14,64,256]
     n_samples: [1000]
 
   diabetes_130:
-    n_features: [4,47]
+    n_features: [14,24,47]
     n_samples: [1000]
 
   covertype:
-    n_features: [4,54]
+    n_features: [14,28,54]
     n_samples: [1000]

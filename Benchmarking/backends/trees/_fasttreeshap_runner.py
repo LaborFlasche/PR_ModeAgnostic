@@ -66,6 +66,15 @@ def main():
 
     result.to_csv(args.output)
 
+    # Base value of the path-dependent game, class-selected like the values above
+    # (binary -> class 1, multiclass -> class 0). Written to a sidecar the parent
+    # backend reads back so the runner can check additivity against the game
+    # fasttreeshap actually explains, not the marginal background baseline.
+    ev = np.ravel(np.asarray(explainer.expected_value, dtype=float))
+    base = float(ev[1] if ev.size == 2 else ev[0])
+    with open(args.output + ".baseline", "w") as f:
+        f.write(repr(base))
+
 
 if __name__ == "__main__":
     try:

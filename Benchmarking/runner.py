@@ -19,6 +19,22 @@ from .metrics import (
 from .timeout import BackendTimeout, time_limit
 
 
+def spec_key(name: str, approximator=None, budget=None) -> str:
+    """pairwise_metrics key for one run spec — single source of truth, shared
+    with scripts/recompute_pairwise_metrics.py so offline recomputes emit the
+    exact keys fresh runs do. True-value backends run once per class and keep
+    the bare backend name (merge_fasttreeshap_repair.py looks entries up by
+    name). Approximation specs can share a class (same library, different
+    approximator/budget), so the key must carry both or the specs would
+    overwrite each other's pairwise entries. Budgets are normalized through
+    int() because a CSV round-trip turns 256 into 256.0."""
+    if approximator is None or (isinstance(approximator, float) and np.isnan(approximator)):
+        return name
+    if isinstance(budget, float) and budget == int(budget):
+        budget = int(budget)
+    return f"{name}|{approximator}|{budget}"
+
+
 class BenchmarkRunner:
     """Runs all backends per (model, data) cell and emits pairwise comparison rows.
 
@@ -65,10 +81,9 @@ class BenchmarkRunner:
         else:
             X_eval = X.iloc[self.n_background:self.n_background + self.n_eval]
 
-        # Additivity check target: every backend explains the same marginal
-        # value function f, so baseline + row-sum of contributions must equal
-        # f(x) (local accuracy). Computed on the raw model, not a
-        # CountingModel, so it never inflates any backend's n_model_evals.
+        # Reference predictions/baseline for the additivity check, using mean
+        # f(background) as the fallback base value for marginal-game backends.
+  
         f = marginal_predict(model, X.columns)
         eval_preds = np.asarray(f(X_eval), dtype=float)
         baseline = float(np.mean(np.asarray(f(background), dtype=float)))
@@ -81,6 +96,7 @@ class BenchmarkRunner:
             true_value_config["seed"] = self.seed
 
         for cls in self.true_value_backends:
+            backend = cls(model, background, true_value_config)
             t0 = time.perf_counter()
             try:
                 with time_limit(self.backend_timeout_s):
@@ -98,6 +114,7 @@ class BenchmarkRunner:
                 "contrib": contrib,
                 "runtime": runtime,
                 "n_model_evals": float("nan"),
+                "baseline": backend.baseline_,
             })
 
         for cls, config in self.approximation_specs:
@@ -113,9 +130,10 @@ class BenchmarkRunner:
             # all-NaN row instead of killing the whole (model, dataset) cell.
             # A timed-out row records runtime_s ~= the timeout (right-censored)
             # — filter NaN-value rows out of mean-runtime aggregations.
+            backend = cls(counter, background, run_config)
             try:
                 with time_limit(self.backend_timeout_s):
-                    contrib = cls(counter, background, run_config).run_explainer(X_eval)
+                    contrib = backend.run_explainer(X_eval)
             except BackendTimeout:
                 print(f"  [SKIP] {cls.name} ({config}): exceeded {self.backend_timeout_s}s timeout")
                 contrib = nan_result(X_eval)
@@ -129,6 +147,7 @@ class BenchmarkRunner:
                 "contrib": contrib,
                 "runtime": runtime,
                 "n_model_evals": counter.n_rows,
+                "baseline": backend.baseline_,
             })
 
         # --- emit one row per backend with pairwise metrics dict ---
@@ -182,7 +201,10 @@ class BenchmarkRunner:
         c_contrib = candidate["contrib"]
         cls = candidate["cls"]
         config = candidate["config"]
-        gap = additivity_gap(c_contrib, eval_preds, baseline)
+        # The backend's own game's base value when reported (path-dependent tree
+        # backends), else the marginal game's (mean f over the background).
+        base = candidate["baseline"] if candidate["baseline"] is not None else baseline
+        gap = additivity_gap(c_contrib, eval_preds, base)
 
         pairwise = {}
         for reference in all_results:
@@ -224,8 +246,9 @@ class BenchmarkRunner:
             "n_eval": len(c_contrib),
             "runtime_s": round(candidate["runtime"], 4),
             "n_model_evals": candidate["n_model_evals"],
+            "base_value": base,
             "additivity_gap": gap,
-            "relative_additivity_gap": relative_additivity_gap(c_contrib, eval_preds, baseline, gap=gap),
+            "relative_additivity_gap": relative_additivity_gap(c_contrib, eval_preds, base, gap=gap),
             "shapley_values": json.dumps(c_contrib.values.flatten().tolist()),
             "shapley_n_eval": c_contrib.shape[0],
             "shapley_n_features": c_contrib.shape[1],
