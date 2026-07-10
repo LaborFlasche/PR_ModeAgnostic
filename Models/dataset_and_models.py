@@ -28,6 +28,39 @@ from enum import Enum
 """This file contains functions to load and train models on the different datasets."""
 
 
+def actual_max_depth(model) -> int:
+    """Deepest root-to-leaf path actually grown in a fitted tree model/ensemble.
+
+    The config's ``max_depth`` is only an upper bound the training may not
+    reach (or may be null = unlimited); results CSVs report this realized
+    depth instead. Dispatches on the fitted estimator via duck typing, so it
+    never imports xgboost/lightgbm itself (see the import-order note above).
+    """
+    if hasattr(model, "tree_"):  # DecisionTree{Regressor,Classifier}
+        return int(model.get_depth())
+    if hasattr(model, "estimators_"):  # RandomForest{Regressor,Classifier}
+        return max(int(e.get_depth()) for e in model.estimators_)
+    if hasattr(model, "_predictors"):  # HistGradientBoosting{Regressor,Classifier}
+        return max(int(p.get_max_depth())
+                   for stage in model._predictors for p in stage)
+    if hasattr(model, "get_booster"):  # XGB{Regressor,Classifier}
+        import json
+
+        def depth(node):
+            if "children" not in node:
+                return 0
+            return 1 + max(depth(c) for c in node["children"])
+
+        return max(depth(json.loads(t))
+                   for t in model.get_booster().get_dump(dump_format="json"))
+    if hasattr(model, "booster_"):  # LGBM{Regressor,Classifier}
+        # node_depth is 1 at the root, so subtract 1 to count edges like the rest.
+        trees = model.booster_.trees_to_dataframe()
+        return int(trees["node_depth"].max()) - 1
+    raise TypeError(
+        f"actual_max_depth: unsupported model type {type(model).__name__}")
+
+
 class Model(Enum):
     # 1) Lineare Baselines
     LINEAR_BASELINE = "linear_baseline"
