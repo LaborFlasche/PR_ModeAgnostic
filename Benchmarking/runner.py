@@ -168,18 +168,12 @@ class BenchmarkRunner:
         has several runs differing by approximator + budget. Keying pairwise
         metrics by name alone collapses them so only the last-listed run survives,
         which both loses comparisons and turns the self-entry non-zero.
-        True-value backends carry no such config and key on the
-        name alone (e.g. "shapiq_approx|kernel|256", "shap_true_value").
+        Delegates to spec_key so fresh runs emit the exact same keys
+        scripts/recompute_pairwise_metrics.py produces offline.
         """
-        name = result["cls"].name
-        approximator = result["config"].get("approximator")
-        budget = result["config"].get("budget")
-        parts = [name]
-        if approximator is not None:
-            parts.append(str(approximator))
-        if budget is not None:
-            parts.append(format(budget, "g") if isinstance(budget, float) else str(budget))
-        return "|".join(parts)
+        return spec_key(result["cls"].name,
+                         result["config"].get("approximator"),
+                         result["config"].get("budget"))
 
     @staticmethod
     def _comparable(candidate: dict, reference: dict) -> bool:
