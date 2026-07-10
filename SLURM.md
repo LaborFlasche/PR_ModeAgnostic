@@ -1,15 +1,7 @@
 # Running the benchmark on the IFI SLURM cluster
 
-Four Research Questions, four configs, **75 independent tasks** in total.
-The queue manager (`slurm/submit_all.py`) submits all of them while staying
-within the Krater partition limit of **30 jobs** (15 running + 15 pending).
-
-| Config key | File | Tasks | RQ |
-|------------|------|-------|----|
-| `accuracy` | `configs/RQ1-accuracy/config-accuracy.yaml` | 12 | Approximation accuracy vs. background size |
-| `dimensionality` | `configs/RQ2-dimensionality/config-dimensionality.yaml` | 36 | Scalability with feature count |
-| `tree` | `configs/RQ4-tree/config-tree.yaml` | 18 | Tree-native backends vs. model-agnostic |
-| `nn` | `configs/RQ3-neural-networks/config-neural-networks-RQ3.yaml` | 9 | Gradient-based backends for neural networks |
+The queue manager (`slurm/submit_all.py`) submits all runs while staying
+within the slurm limit of **30 jobs** (15 running + 15 pending).
 
 ---
 
@@ -73,51 +65,29 @@ uv sync
 
 ## 3. Pre-download datasets (do this once on the login node)
 
-Compute nodes may have no outbound internet access. Cache all datasets first.
-
-To check what is already cached (never downloads anything — it blocks network
-access and reports any dataset that would need it):
-
-```bash
-uv run python scripts/check_dataset_cache.py            # all configs/*.yaml
-uv run python scripts/check_dataset_cache.py configs/RQ4-tree/config-tree.yaml
-```
-
-Exit code 0 means every dataset loads offline; 1 lists the missing ones, which
-the snippet below then downloads.
-Run once per unique `(dataset, n_features, n_samples)` combination across
-**every** config in `configs/*.yaml` (not just the four RQ configs — this glob
-matches what `check_dataset_cache.py` checks by default, so it can't go stale
-as configs are added):
+Compute nodes may have no outbound internet access. Cache all datasets first,
+on the login node (its NFS home is shared with every compute node, so one run
+caches for all):
 
 ```bash
 cd ~/PR_ModeAgnostic
-uv run python - <<'EOF'
-import glob, yaml, itertools
-from Models.dataset_and_models import Dataset
+uv run python scripts/cache_datasets.py                          # all configs/*/*.yaml
+uv run python scripts/cache_datasets.py configs/RQ4-tree/config-tree.yaml   # or specific configs
+```
 
-configs = sorted(glob.glob("configs/*.yaml"))
-seen = set()
-for cfg_path in configs:
-    with open(cfg_path) as f:
-        cfg = yaml.safe_load(f)
-    seed = cfg["benchmark"]["seed"]
-    for ds_key, params in cfg["datasets"].items():
-        for nf in params.get("n_features", [None]):
-            for ns in params.get("n_samples", [None]):
-                key = (ds_key, nf, ns)
-                if key in seen:
-                    continue
-                seen.add(key)
-                print(f"Fetching {ds_key} nf={nf} ns={ns} ...")
-                kw = {}
-                if nf is not None:
-                    kw["n_features"] = nf
-                if ns is not None:
-                    kw["n_samples"] = ns
-                Dataset[ds_key.upper()].load_dataset(**kw, seed=seed)
-print(f"Done — {len(seen)} unique (dataset, n_features, n_samples) combinations cached across {len(configs)} configs.")
-EOF
+This loads each dataset **once** — the fetch that populates the cache downloads
+the full dataset before any subsampling, so `n_features`/`n_samples`/`seed`
+don't affect what's cached. Re-running is cheap: already-cached datasets are
+read from disk without touching the network.
+
+After running it, you can also verify that everything loads offline with
+`check_dataset_cache.py` (never downloads — it blocks network access and reports
+any dataset that would still need it). Exit code 0 means all cached; 1 lists the
+missing ones:
+
+```bash
+uv run python scripts/check_dataset_cache.py                     # all configs/*/*.yaml
+uv run python scripts/check_dataset_cache.py configs/RQ4-tree/config-tree.yaml
 ```
 
 ---
@@ -278,72 +248,79 @@ The four merged files produced are:
 
 ```
 slurm/
-├── submit_all.py       ← main entry point: queue manager for all 4 configs
-├── submit.sh           ← legacy single-config submitter (no queue throttling)
-├── single_task.sh      ← generic sbatch wrapper used by submit_all.py
-├── bench_array.sh      ← SLURM array script for model-agnostic / tree configs
-├── bench_array_nn.sh   ← SLURM array script for NN config
-├── merge.sh            ← SLURM merge job (auto-triggered after all tasks)
-├── run_benchmark.py    ← worker: one (dataset, model) cell, first-order +
-│                          order-2 tree interactions; sweeps n_background if list
-├── run_benchmark_nn.py ← worker: NN-specific gradient-based + model-agnostic backends
-├── submit.sh           ← entry point: run this to submit everything (picks the
-│                          array script below based on the config name)
-├── bench_array.sh      ← SLURM array job definition (CPU); takes (config, output_dir) args
-├── bench_array_gpu.sh  ← GPU counterpart (NvidiaAll partition); used for any
-│                          config whose name contains "gpu"
-├── merge.sh            ← SLURM merge job (auto-triggered after array)
-├── run_benchmark.py    ← worker: runs one (dataset, model) cell, both first-order
-│                          and (for tree models) the order-2 interaction sweep
-├── merge_results.py    ← merges per-task CSVs into results_<config_name>.csv
-├── count_tasks.py      ← prints the number of task combinations for a given config
-└── logs/               ← per-task stdout/stderr (gitignored)
+├── submit_all.py        ← main entry point: queue manager that submits every config
+│                           while respecting the 30-job Krater limit (see CONFIG_REGISTRY)
+├── submit.sh            ← legacy single-config submitter (full array at once, no throttling)
+├── single_task.sh       ← generic sbatch wrapper: runs one (worker, task-id, config) job
+├── bench_array.sh       ← SLURM array script (CPU) for model-agnostic / tree configs
+├── bench_array_gpu.sh   ← array script counterpart targeting the NvidiaAll partition
+├── bench_array_nn.sh    ← array script for the NN configs
+├── merge.sh             ← SLURM merge job (auto-triggered after all tasks succeed)
+├── run_benchmark.py     ← worker: one (seed, dataset, model) cell — first-order plus
+│                           order-2 tree interactions; sweeps seed / n_background if lists
+├── run_benchmark_nn.py  ← worker: NN-specific gradient-based + model-agnostic backends
+├── merge_results.py     ← merges per-task CSVs into results_<config_name>.csv
+├── count_tasks.py       ← prints the task count for a given config
+└── logs/                ← per-task stdout/stderr (gitignored)
 
-configs/
-├── config-accuracy.yaml            ← RQ: accuracy vs. background size (12 tasks)
-├── config-dimensionality.yaml      ← RQ: scalability with feature count (36 tasks)
-├── config-tree.yaml                ← RQ: tree-native backends (18 tasks)
-└── config-neural-networks-RQ3.yaml ← RQ: gradient-based NN backends (9 tasks)
-├── config.yaml           ← model-agnostic sweep (libraries, approximators, models)
-├── config-tree.yaml      ← tree-specific sweep (tree backends, interactions)
-└── config-tree-gpu.yaml  ← woodelf cpu-vs-gpu sweep (path_dependent/interventional,
-                             each in a CPU and a GPU=True variant)
+configs/                 ← one folder per Research Question; scripts glob configs/*/*.yaml
+├── RQ1-accuracy/
+│   └── config-accuracy.yaml               ← accuracy vs. background size
+├── RQ2-dimensionality/
+│   ├── config-dimensionality.yaml         ← scalability with feature count
+│   └── config-dimensionality-extreme.yaml ← extreme high-dimensional variant
+├── RQ3-neural-networks/
+│   ├── config-neural-networks-RQ3.yaml     ← gradient-based NN backends (GPU)
+│   ├── config-neural-networks-RQ3-cpu.yaml ← CPU variant
+│   └── config-test-nn-RQ3.yaml             ← small smoke-test config
+├── RQ4-tree/
+│   ├── config-tree.yaml                    ← tree-native backends vs. model-agnostic
+│   └── config-tree-fasttreeshap.yaml       ← fasttreeshap-only repair sweep
+└── RQ5-gpu/
+    └── config-tree-gpu.yaml                ← woodelf cpu-vs-gpu sweep (needs a GPU node)
 
 Benchmarking/
-├── runner.py            ← BenchmarkRunner — oracle + approximators per cell
+├── runner.py            ← BenchmarkRunner — runs one oracle + backends/approximators per cell
 ├── metrics.py           ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
+├── eval_counter.py      ← counts model evaluations per backend
+├── timeout.py           ← per-backend wall-clock timeout wrapper
 ├── backends/            ← one class per (library, mode)
-├── results_config-accuracy.csv           ← merged after step 5/7
-├── results_config-dimensionality.csv     ← merged after step 5/7
-├── results_config-tree.csv               ← merged after step 5/7
+│   ├── base_backend.py      ← shared backend interface
+│   ├── approximators/       ← model-agnostic: captum / dalex / lightshap / shap(+nn) / shapiq(+nn)
+│   ├── trees/               ← tree-native: tree_shap / tree_shapiq / woodelf / fasttreeshap
+│   └── true_value/          ← exact-value oracles: dalex / lightshap / shap / shapiq
+├── results_config-accuracy.csv            ← merged after step 5/7
+├── results_config-dimensionality.csv      ← merged after step 5/7
+├── results_config-tree.csv                ← merged after step 5/7
 ├── results_config-neural-networks-RQ3.csv ← merged after step 5/7
-├── runner.py            ← BenchmarkRunner — runs one oracle + backends/approximations per cell
-├── metrics.py            ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
-├── backends/             ← one class per (library, mode); tree_*.py / woodelf_backend.py /
-│                            fasttreeshap_backend.py / gputreeshap_backend.py are tree-specific
-├── results_config.csv         ← merged model-agnostic results (after step 5/7)
-├── results_config-tree.csv    ← merged tree results (after step 5/7)
-├── results_config-tree-gpu.csv ← merged woodelf cpu-vs-gpu results (after step 5/7)
 └── slurm_results/
-    ├── config-accuracy/          ← per-task CSVs (gitignored)
-    ├── config-dimensionality/    ← per-task CSVs (gitignored)
-    ├── config-tree/              ← per-task CSVs (gitignored)
+    ├── config-accuracy/            ← per-task CSVs (gitignored)
+    ├── config-dimensionality/      ← per-task CSVs (gitignored)
+    ├── config-tree/                ← per-task CSVs (gitignored)
     └── config-neural-networks-RQ3/ ← per-task CSVs (gitignored)
-    ├── config/             ← model-agnostic run's per-task CSVs (gitignored)
-    ├── config-tree/        ← tree run's per-task CSVs (gitignored)
-    └── config-tree-gpu/    ← gpu run's per-task CSVs (gitignored)
 
 Models/
 ├── dataset_and_models.py ← Dataset/Model enums; Model.is_tree gates the tree-specific sweep
-├── config_parser.py      ← load_config / load_dataset_config — expand a config.yaml into parameter lists
-└── trainers.py            ← SklearnTrainer / PytorchTrainer
+├── config_parser.py      ← load_config / load_dataset_config — expand a config into param lists
+├── architectures.py      ← neural-network architecture definitions
+├── load_and_train.py     ← model construction + training entry points
+└── trainers.py           ← SklearnTrainer / PytorchTrainer
 
 Datasets/
-└── load_datasets.py      ← dataset download/caching helpers (used by step 3)
+├── load_datasets.py      ← Dataset enum + shared loader pipeline (fetch → impute/encode →
+│                           subsample → variance feature-select); step 3's scripts cache
+│                           these datasets by calling Dataset.load_dataset()
+└── dataset.md            ← reference table of the nine datasets (features, task, domain)
 
 scripts/
-└── setup_fasttreeshap_env.sh  ← provisions the dedicated venv fasttreeshap needs (numpy<2);
-                                   run once before submitting a tree-config job that uses it
+├── cache_datasets.py            ← step 3: pre-download every config's datasets into the
+│                                   shared cache — one load per dataset key (no internet
+│                                   needed on compute nodes afterwards)
+├── check_dataset_cache.py       ← step 3: verify every dataset loads offline (blocks the
+│                                   network, never downloads); exit 0 = all cached, 1 = missing
+├── merge_fasttreeshap_repair.py ← merges the fasttreeshap repair-sweep CSVs (see BUGS_TO_FIX)
+└── setup_fasttreeshap_env.sh    ← provisions the dedicated venv fasttreeshap needs (numpy<2);
+                                    run once before submitting a tree-config job that uses it
 
 tests/                    ← pytest suite — run with `uv run pytest tests/` before submitting
 pyproject.toml            ← project metadata and dependencies
