@@ -19,6 +19,22 @@ from .metrics import (
 from .timeout import BackendTimeout, time_limit
 
 
+def spec_key(name: str, approximator=None, budget=None) -> str:
+    """pairwise_metrics key for one run spec — single source of truth, shared
+    with scripts/recompute_pairwise_metrics.py so offline recomputes emit the
+    exact keys fresh runs do. True-value backends run once per class and keep
+    the bare backend name (merge_fasttreeshap_repair.py looks entries up by
+    name). Approximation specs can share a class (same library, different
+    approximator/budget), so the key must carry both or the specs would
+    overwrite each other's pairwise entries. Budgets are normalized through
+    int() because a CSV round-trip turns 256 into 256.0."""
+    if approximator is None or (isinstance(approximator, float) and np.isnan(approximator)):
+        return name
+    if isinstance(budget, float) and budget == int(budget):
+        budget = int(budget)
+    return f"{name}|{approximator}|{budget}"
+
+
 class BenchmarkRunner:
     """Runs all backends per (model, data) cell and emits pairwise comparison rows.
 
@@ -142,6 +158,7 @@ class BenchmarkRunner:
     def _nan_contrib(cls: Type[BaseBackend], X_eval: pd.DataFrame) -> pd.DataFrame:
         return nan_result(X_eval) if cls.order == 1 else nan_interaction_result(X_eval)
 
+
     def _row(self, run_meta, candidate, all_results, eval_preds, baseline) -> dict:
         c_contrib = candidate["contrib"]
         cls = candidate["cls"]
@@ -150,7 +167,9 @@ class BenchmarkRunner:
 
         pairwise = {}
         for reference in all_results:
-            ref_name = reference["cls"].name
+            ref_config = reference["config"]
+            ref_name = spec_key(reference["cls"].name,
+                                ref_config.get("approximator"), ref_config.get("budget"))
             if candidate is reference:
                 pairwise[ref_name] = {
                     "mean_abs_diff": 0.0,
