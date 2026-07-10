@@ -48,6 +48,10 @@ CONFIG_REGISTRY = {
         "config": "configs/RQ2-dimensionality/config-dimensionality.yaml",
         "worker": "slurm/run_benchmark.py",
     },
+    "dimensionality-extreme": {
+        "config": "configs/RQ2-dimensionality/config-dimensionality-extreme.yaml",
+        "worker": "slurm/run_benchmark.py",
+    },
     "tree": {
         "config": "configs/RQ4-tree/config-tree.yaml",
         "worker": "slurm/run_benchmark.py",
