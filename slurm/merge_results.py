@@ -34,7 +34,7 @@ def main():
     # column in the identity automatically.
     output_cols = {
         "library", "computation_type", "n_eval", "runtime_s", "n_model_evals",
-        "additivity_gap", "relative_additivity_gap", "shapley_values",
+        "base_value", "additivity_gap", "relative_additivity_gap", "shapley_values",
         "shapley_n_eval", "shapley_n_features", "pairwise_metrics",
     }
     identity_cols = [c for c in df.columns if c not in output_cols]

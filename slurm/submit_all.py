@@ -12,7 +12,7 @@ Usage (run from repo root, in a persistent session such as tmux/screen):
     python slurm/submit_all.py --configs accuracy dimensionality
     python slurm/submit_all.py --configs tree nn
 
-Available config keys: accuracy, dimensionality, tree, nn, tree-gpu
+Available config keys: see CONFIG_REGISTRY below.
 """
 import argparse
 import glob
@@ -20,14 +20,11 @@ import os
 import subprocess
 import sys
 import time
-from collections import defaultdict
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-import yaml
-from sklearn.model_selection import ParameterGrid
-from Models.config_parser import load_config, load_dataset_config, as_list
+from task_grid import build_all_runs
 
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls
@@ -81,18 +78,18 @@ CONFIG_REGISTRY = {
 # ---------------------------------------------------------------------------
 
 def count_tasks(config_path: str) -> int:
-    """Must match the task grid built by build_all_runs in slurm/run_benchmark.py
-    and slurm/run_benchmark_nn.py: seed and n_background are swept as extra grid
-    dimensions (scalar or list), same as slurm/count_tasks.py. Counting only
-    models × datasets previously submitted just the first slice of the grid
-    (seed is the outermost loop) and silently dropped every other seed."""
-    model_runs = [p for pg in load_config(config_path).values() for p in ParameterGrid(pg)]
-    dataset_runs = [p for pg in load_dataset_config(config_path).values() for p in ParameterGrid(pg)]
-    with open(os.path.join(REPO_ROOT, config_path)) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    n_seeds = len(as_list(bench["seed"]))
-    n_backgrounds = len(as_list(bench["n_background"]))
-    return len(model_runs) * len(dataset_runs) * n_seeds * n_backgrounds
+    """Number of array tasks — exactly the grid the workers index into via
+    --task-id (task_grid.build_all_runs is the single source of truth)."""
+    return len(build_all_runs(os.path.join(REPO_ROOT, config_path)))
+
+
+def result_paths(config_key: str) -> tuple[str, str, str]:
+    """(config_path, per-task output dir, merged CSV path) for one config."""
+    config_path = CONFIG_REGISTRY[config_key]["config"]
+    config_name = os.path.basename(config_path).replace(".yaml", "")
+    return (config_path,
+            f"Benchmarking/slurm_results/{config_name}",
+            f"Benchmarking/results_{config_name}.csv")
 
 
 # ---------------------------------------------------------------------------
@@ -130,9 +127,7 @@ def get_active_job_ids(job_ids: set[int]) -> set[int]:
 def submit_task(config_key: str, task_id: int) -> int | None:
     """Submit one (config, task_id) as a single SLURM job. Returns job ID or None."""
     spec = CONFIG_REGISTRY[config_key]
-    config_path = spec["config"]
-    config_name = os.path.basename(config_path).replace(".yaml", "")
-    output_dir = f"Benchmarking/slurm_results/{config_name}"
+    config_path, output_dir, _ = result_paths(config_key)
 
     os.makedirs(os.path.join(REPO_ROOT, output_dir), exist_ok=True)
 
@@ -165,11 +160,7 @@ def submit_task(config_key: str, task_id: int) -> int | None:
 
 def submit_merge(config_key: str) -> None:
     """Submit the merge job for a config (blocks until sbatch returns)."""
-    spec = CONFIG_REGISTRY[config_key]
-    config_path = spec["config"]
-    config_name = os.path.basename(config_path).replace(".yaml", "")
-    input_dir = f"Benchmarking/slurm_results/{config_name}"
-    output_csv = f"Benchmarking/results_{config_name}.csv"
+    _, input_dir, output_csv = result_paths(config_key)
 
     result = subprocess.run(
         [
@@ -197,20 +188,18 @@ def run(selected: list[str]) -> None:
     pending: list[tuple[str, int]] = []
     print("Config task counts:")
     for key in selected:
-        cfg = CONFIG_REGISTRY[key]["config"]
+        cfg, output_dir, _ = result_paths(key)
         n = count_tasks(cfg)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
         # Start from a clean per-task output dir (same as submit.sh): workers only
         # overwrite their own results_<task_id>.csv, so a previous sweep with a
         # larger grid would leave higher-numbered files behind and leak stale
         # rows into the merged CSV.
-        config_name = os.path.basename(cfg).replace(".yaml", "")
-        output_dir = os.path.join(REPO_ROOT, "Benchmarking", "slurm_results", config_name)
+        output_dir = os.path.join(REPO_ROOT, output_dir)
         os.makedirs(output_dir, exist_ok=True)
         for stale in glob.glob(os.path.join(output_dir, "results_*.csv")):
             os.remove(stale)
-        for task_id in range(n):
-            pending.append((key, task_id))
+        pending += [(key, task_id) for task_id in range(n)]
 
     total = len(pending)
     print(f"\nTotal: {total} tasks | MAX_JOBS={MAX_JOBS} | poll every {POLL_INTERVAL}s")
@@ -285,7 +274,7 @@ def main() -> None:
         nargs="+",
         default=["all"],
         metavar="KEY",
-        help='Config key(s) to run, or "all" for all five. Default: all',
+        help='Config key(s) to run, or "all" for every registered config. Default: all',
     )
     args = parser.parse_args()
 
