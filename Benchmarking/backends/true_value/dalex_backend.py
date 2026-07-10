@@ -8,7 +8,9 @@ class DalexTrueBackend(BaseBackend):
     """dalex's permutation-sampling SHAP (``predict_parts(type="shap")``), run as a true-value backend.
 
     because dalex does not use determistic sampling so duplicates can occur. That's why dalex is not able to perform true value shapley values.
-    We try to get as close as possible to the true value by setting B = 2^n_features. This is not feasible for n_features > 14, so we throw a warning in that case.
+    We try to get as close as possible to the true value by spending a total predict_parts budget
+    of 2^n_features model evaluations (B = 2^n_features / (n_features+1) orderings). This is not
+    feasible for n_features > 14, so we throw a warning in that case.
 
     config:
         seed: random_state for dalex.
@@ -42,8 +44,9 @@ class DalexTrueBackend(BaseBackend):
                 f"{self._EXACT_MAX_FEATURES} — B=2**{n_features} orderings is "
                 "infeasible; results will not be close to the true value."
             )
-        # Dalex does not allow true value computation -> we try to get as close as possible by setting B = 2^n_features
-        B = 2**n_features
+        # Dalex does not allow true value computation -> we try to get as close as possible by
+        # spending a total predict_parts budget of 2^n_features model evals.
+        B = max(1, 2**n_features // (n_features + 1))
 
         f = marginal_predict(self.model, columns)
 
