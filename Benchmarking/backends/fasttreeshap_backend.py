@@ -61,6 +61,12 @@ class _FastTreeShapBackend(BaseBackend):
                 print(f"  [BUG] {self.name} subprocess failed: {result.stderr.strip()[-500:]}", file=sys.stderr)
                 return self._nan(x)
 
+            # Sidecar written by the runner script: base value of the
+            # path-dependent game fasttreeshap explains (see _fasttreeshap_runner.py).
+            baseline_path = Path(str(output_path) + ".baseline")
+            if baseline_path.exists():
+                self.baseline_ = float(baseline_path.read_text())
+
             return pd.read_csv(output_path, index_col=0)
 
 

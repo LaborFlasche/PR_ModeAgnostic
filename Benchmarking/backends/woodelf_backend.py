@@ -1,4 +1,5 @@
 import pandas as pd
+import shap
 from woodelf import WoodelfExplainer
 
 from .base_backend import (
@@ -8,7 +9,18 @@ from .base_backend import (
     reduce_multiclass,
     flatten_interactions,
     cuda_available,
+    select_base_value,
 )
+
+
+def _path_dependent_base_value(model) -> float:
+    """Base value of the path-dependent game woodelf explains. woodelf never
+    reports one, but the game is fully determined by the model (cover-weighted
+    leaf expectation) and is identical to shap's path-dependent TreeExplainer
+    game (their values agree to ~1e-8), so shap's expected_value is exact.
+    select_base_value's binary -> class 1 pick also matches the sign-flip
+    correction applied to sklearn binary classifiers below."""
+    return select_base_value(shap.TreeExplainer(model).expected_value)
 
 
 def _woodelf_gpu_ok() -> tuple[bool, str]:
@@ -50,28 +62,42 @@ def _woodelf_multiclass_unsupported(model) -> bool:
 
 
 def _woodelf_class_sign_is_flipped(model) -> bool:
-    """True for sklearn-native binary classifiers, where woodelf's values come out
-    sign-flipped relative to every other backend's class-1 convention.
+    """True for sklearn binary classifiers with probability leaves, where
+    woodelf's values come out sign-flipped relative to every other backend's
+    class-1 convention.
 
     Root cause (upstream, in the installed woodelf package, not this repo): woodelf
     parses trees by reusing shap's own loader (parse_models.py: "Use the shap
     package's Decision Tree loading. this is cheating, I know...") and then takes
     ``tree.values[index][0]`` as the leaf value (parse_models.py's
-    ``load_decision_tree``). For sklearn-native classifiers, shap's ``SingleTree``
+    ``load_decision_tree``). For sklearn CART classifiers, shap's ``SingleTree``
     reshapes sklearn's per-node ``(1, n_classes)`` value array into ``n_classes``
     columns (shap/explainers/_tree.py's ``SingleTree.__init__``), so for binary
     classification index 0 is class 0's probability — not class 1, the convention
     used everywhere else here (``ShapTrueValueBackend``, ``marginal_predict``,
     ``reduce_multiclass``). Since prob(class 0) = 1 - prob(class 1) and Shapley
     values are linear in the value function, this is an exact sign flip.
-    Regressors are unaffected (a single output column, so index 0 is correct);
-    xgboost/lightgbm are unaffected (native leaf values, not sklearn's
-    ``tree.value``, so this reshape never applies to them).
+
+    Only fires for models whose leaves actually store per-class columns —
+    DecisionTreeClassifier (``tree_``) and forest classifiers (a list of such
+    trees in ``estimators_``). A plain "module starts with sklearn" test is
+    wrong: HistGradientBoostingClassifier is sklearn too, but its leaves hold a
+    single log-odds margin column whose index 0 is already the class-1
+    direction — flipping it would corrupt correct values (verified: woodelf's
+    raw HistGBC output matches shap to ~1e-7). Regressors are unaffected
+    (single output column); xgboost/lightgbm are unaffected (native leaf
+    values, not sklearn's ``tree.value``, so the reshape never applies).
     """
+    if not (hasattr(model, "classes_") and len(model.classes_) == 2):
+        return False
+    if hasattr(model, "tree_"):  # DecisionTreeClassifier
+        return True
+    estimators = getattr(model, "estimators_", None)  # RandomForest/ExtraTrees
     return (
-        type(model).__module__.startswith("sklearn")
-        and hasattr(model, "classes_")
-        and len(model.classes_) == 2
+        isinstance(estimators, list)
+        and len(estimators) > 0
+        and hasattr(estimators[0], "tree_")
+        and hasattr(estimators[0], "classes_")
     )
 
 
@@ -106,6 +132,11 @@ class _WoodelfBackend(BaseBackend):
             print(f"  [BUG] {self.name} could not run on this model: {e.__class__.__name__}: {e}")
             return nan_result(x)
 
+        # Interventional woodelf explains the marginal game over the runner's
+        # background, whose base value is the runner's own fallback — only the
+        # path-dependent game needs its base value reported explicitly.
+        if not self.interventional:
+            self.baseline_ = _path_dependent_base_value(self.model)
         reduced = reduce_multiclass(values)
         if _woodelf_class_sign_is_flipped(self.model):
             reduced = -reduced
@@ -160,6 +191,7 @@ class WoodelfInteractionBackend(BaseBackend):
             print(f"  [BUG] {self.name} could not run on this model: {e.__class__.__name__}: {e}")
             return nan_interaction_result(x)
 
+        self.baseline_ = _path_dependent_base_value(self.model)
         reduced = reduce_multiclass(values, order=2)
         if _woodelf_class_sign_is_flipped(self.model):
             reduced = -reduced

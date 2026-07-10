@@ -1,7 +1,7 @@
 import pandas as pd
 import shap
 
-from .base_backend import BaseBackend, reduce_multiclass, flatten_interactions
+from .base_backend import BaseBackend, reduce_multiclass, flatten_interactions, select_base_value
 
 
 class ShapTreePathDependentBackend(BaseBackend):
@@ -18,6 +18,7 @@ class ShapTreePathDependentBackend(BaseBackend):
             sv = explainer(x, check_additivity=False)
         except TypeError:
             sv = explainer(x)
+        self.baseline_ = select_base_value(explainer.expected_value)
         values = reduce_multiclass(sv.values)
         return pd.DataFrame(values, index=x.index, columns=x.columns)
 
@@ -34,5 +35,6 @@ class ShapInteractionBackend(BaseBackend):
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         explainer = shap.TreeExplainer(self.model)
+        self.baseline_ = select_base_value(explainer.expected_value)
         values = reduce_multiclass(explainer.shap_interaction_values(x), order=2)
         return flatten_interactions(values, x)
