@@ -1,15 +1,15 @@
 #!/bin/bash
 # Run this from the repo root:  bash slurm/submit.sh <config_path>
-# The config path is required, e.g. configs/config-accuracy.yaml. Run it again
-# with a different config (e.g. configs/config-tree.yaml) for another sweep —
-# each config gets its own output directory and merged CSV so the runs don't
-# collide and can be submitted in parallel.
+# The config path is required, e.g. configs/RQ1-accuracy/config-accuracy.yaml.
+# Run it again with a different config (e.g. configs/RQ4-tree/config-tree.yaml)
+# for another sweep — each config gets its own output directory and merged CSV
+# so the runs don't collide and can be submitted in parallel.
 # Run this from the repo root:  bash slurm/submit.sh [config_path]
 # Defaults to configs/config.yaml (model-agnostic). Run again with
-# configs/config-tree.yaml for the tree-specific sweep, or
-# configs/config-tree-gpu.yaml for the woodelf cpu-vs-gpu sweep (runs on a GPU
-# node, see slurm/bench_array_gpu.sh) — each config gets its own output
-# directory and merged CSV so the runs don't collide.
+# configs/RQ4-tree/config-tree.yaml for the tree-specific sweep, or
+# configs/RQ5-gpu/config-tree-gpu.yaml for the woodelf cpu-vs-gpu sweep (runs
+# on a GPU node, see slurm/bench_array_gpu.sh) — each config gets its own
+# output directory and merged CSV so the runs don't collide.
 # It submits the array job and then a merge job that waits for it.
 
 set -e
@@ -18,17 +18,21 @@ cd "$REPO_ROOT"
 
 CONFIG="$1"
 if [ -z "$CONFIG" ]; then
-    echo "Usage: bash slurm/submit.sh <config_path>   (e.g. config-accuracy.yaml or configs/config-accuracy.yaml)" >&2
+    echo "Usage: bash slurm/submit.sh <config_path>   (e.g. config-accuracy.yaml or configs/RQ1-accuracy/config-accuracy.yaml)" >&2
     exit 1
 fi
-# Allow passing just the filename: fall back to configs/ if not found as given.
-[ -f "$CONFIG" ] || CONFIG="configs/$CONFIG"
+# Allow passing just the filename: search configs/ (and its RQ*/ subfolders)
+# if not found as given.
+if [ ! -f "$CONFIG" ]; then
+    FOUND="$(find configs -maxdepth 2 -type f -name "$(basename "$CONFIG")" | head -1)"
+    [ -n "$FOUND" ] && CONFIG="$FOUND"
+fi
 CONFIG_NAME="$(basename "$CONFIG" .yaml)"
 OUTPUT_DIR="Benchmarking/slurm_results/$CONFIG_NAME"
 MERGED_CSV="Benchmarking/results_$CONFIG_NAME.csv"
 
 # Pick the array script once: NN configs use run_benchmark_nn.py, GPU configs
-# (name contains "gpu", e.g. configs/config-tree-gpu.yaml) need a GPU node
+# (name contains "gpu", e.g. configs/RQ5-gpu/config-tree-gpu.yaml) need a GPU node
 # (--gres=gpu:1, NvidiaAll partition — see slurm/bench_array_gpu.sh), everything
 # else runs the CPU array script. Must stay a single if/elif chain: two separate
 # assignments previously let the CPU branch silently overwrite the GPU choice.

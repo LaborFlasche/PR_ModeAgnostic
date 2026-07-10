@@ -9,6 +9,6 @@
 # $1 = config path, $2 = output dir — both passed through by submit.sh so each
 # config writes to its own results directory.
 
-CONFIG="${1:-configs/config-neural-networks-RQ3.yaml}"
+CONFIG="${1:-configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml}"
 OUTPUT_DIR="${2:-Benchmarking/slurm_results}"
 ~/.local/bin/uv run python slurm/run_benchmark_nn.py --task-id "$SLURM_ARRAY_TASK_ID" --config "$CONFIG" --output-dir "$OUTPUT_DIR"

@@ -15,6 +15,7 @@ Usage (run from repo root, in a persistent session such as tmux/screen):
 Available config keys: accuracy, dimensionality, tree, nn, tree-gpu
 """
 import argparse
+import glob
 import os
 import subprocess
 import sys
@@ -40,34 +41,34 @@ POLL_INTERVAL = 60  # seconds between squeue polls
 # necessary and sufficient; the node's GPU is directly visible to the job.
 CONFIG_REGISTRY = {
     "accuracy": {
-        "config": "configs/config-accuracy.yaml",
+        "config": "configs/RQ1-accuracy/config-accuracy.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     "dimensionality": {
-        "config": "configs/config-dimensionality.yaml",
+        "config": "configs/RQ2-dimensionality/config-dimensionality.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     "tree": {
-        "config": "configs/config-tree.yaml",
+        "config": "configs/RQ4-tree/config-tree.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     # fasttreeshap-only repair sweep (see BUGS_TO_FIX.md Bug 5); requires
     # scripts/setup_fasttreeshap_env.sh to have been run on the cluster first.
     "tree-fasttreeshap": {
-        "config": "configs/config-tree-fasttreeshap.yaml",
+        "config": "configs/RQ4-tree/config-tree-fasttreeshap.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     "nn": {
-        "config": "configs/config-neural-networks-RQ3.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
     "nn-cpu": {
-        "config": "configs/config-neural-networks-RQ3-cpu.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
     },
     "tree-gpu": {
-        "config": "configs/config-tree-gpu.yaml",
+        "config": "configs/RQ5-gpu/config-tree-gpu.yaml",
         "worker": "slurm/run_benchmark.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
@@ -199,6 +200,15 @@ def run(selected: list[str]) -> None:
         cfg = CONFIG_REGISTRY[key]["config"]
         n = count_tasks(cfg)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
+        # Start from a clean per-task output dir (same as submit.sh): workers only
+        # overwrite their own results_<task_id>.csv, so a previous sweep with a
+        # larger grid would leave higher-numbered files behind and leak stale
+        # rows into the merged CSV.
+        config_name = os.path.basename(cfg).replace(".yaml", "")
+        output_dir = os.path.join(REPO_ROOT, "Benchmarking", "slurm_results", config_name)
+        os.makedirs(output_dir, exist_ok=True)
+        for stale in glob.glob(os.path.join(output_dir, "results_*.csv")):
+            os.remove(stale)
         for task_id in range(n):
             pending.append((key, task_id))
 

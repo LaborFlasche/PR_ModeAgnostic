@@ -12,6 +12,7 @@ Usage:
 Run from the repo root so that Models/, Benchmarking/, configs/ are importable.
 """
 import argparse
+import json
 import os
 import sys
 import warnings
@@ -28,7 +29,7 @@ from Models.dataset_and_models import Dataset, Model
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
     ShapIQTrueValueBackend,
-    ShapIQProxyBackend,
+    ShapIQNNApproxBackend,
     CaptumApproxBackend,
     ShapNNApproxBackend,
     LightShapApproxBackend,
@@ -40,7 +41,7 @@ APPROX_MAP = {
     "shap_nn": ShapNNApproxBackend,
     "lightshap": LightShapApproxBackend,
     "dalex": DalexApproxBackend,
-    "shapiq_proxy": ShapIQProxyBackend,
+    "shapiq_proxy": ShapIQNNApproxBackend,
 }
 
 NN_TRUE_VALUE_MAP = {
@@ -49,10 +50,13 @@ NN_TRUE_VALUE_MAP = {
 
 
 def build_approx_specs(bench: dict) -> list[tuple]:
-    """(backend class, config) per library × approximator × budget, filtered by
+    """(backend class, config) per approx_backend × approximator × budget, filtered by
     each backend's SUPPORTED_APPROXIMATORS. An optional top-level `proxy_model`
     key ("xgboost"/"lightgbm"/"tree"/"linear") is forwarded to ProxySHAP specs
-    only — see ShapIQProxyBackend for why non-default proxies matter locally."""
+    only — see ShapIQNNApproxBackend for why non-default proxies matter locally."""
+    if "libraries" in bench:
+        raise ValueError(
+            "config key 'libraries' was renamed to 'approx_backends', update the config")
     proxy_model = bench.get("proxy_model")
     return [
         (
@@ -60,11 +64,27 @@ def build_approx_specs(bench: dict) -> list[tuple]:
             {"approximator": appr, "budget": bgt}
             | ({"proxy_model": proxy_model} if proxy_model and appr == "proxy" else {}),
         )
-        for lib in bench["libraries"]
+        for lib in bench["approx_backends"]
         for appr in bench["approximators"]
         for bgt in bench["budgets"]
         if appr in getattr(APPROX_MAP[lib], "SUPPORTED_APPROXIMATORS", bench["approximators"])
     ]
+
+
+def build_run_meta(*, dataset: str, dataset_params: dict, model: str,
+                   n_background: int, device: str,
+                   model_params: dict | None = None) -> dict:
+    """Identity metadata for every CSV row of one cell. Records the device —
+    cpu and cuda sweeps of the same config are otherwise indistinguishable in
+    merged results — and flattens dataset and model params in (parity with
+    run_benchmark.py's run_meta). Non-scalar model params (e.g. mlp's
+    hidden_sizes list) are JSON-encoded so the CSV cells stay hashable for
+    merge_results.py's drop_duplicates."""
+    mp_meta = {k: json.dumps(v) if isinstance(v, (list, dict)) else v
+               for k, v in (model_params or {}).items()}
+    return {"dataset": dataset, "model": model, "order": 1,
+            "n_background": n_background, "device": device,
+            **dataset_params, **mp_meta}
 
 
 def build_all_runs(config_path: str) -> list[tuple]:
@@ -93,7 +113,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
-    parser.add_argument("--config", default="configs/config-neural-networks-RQ3.yaml")
+    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml")
     parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
     args = parser.parse_args()
 
@@ -145,7 +165,9 @@ def main():
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": n_background, **dp},
+        run_meta=build_run_meta(dataset=dk, dataset_params=dp, model=mk,
+                                n_background=n_background, device=device,
+                                model_params=mp),
     )
 
     print(f"[task {args.task_id}] done -> {output_csv}")

@@ -29,12 +29,16 @@ class BaseBackend(ABC):
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         """Return contributions as a DataFrame of shape (n_samples, n_features)."""
 
+    @abstractmethod
+    def load_config(self) -> dict:
+        """Return a config dict for this backend, with default values filled in."""
+
 
 def marginal_predict(model, columns):
-    """Scalar value function in each model's natural additive output space
-    (regressors -> predict, XGB/LGBM classifiers -> margin, other classifiers
-    with decision_function -> log-odds margin, else -> predict_proba), matching
-    what the shap oracle is additive in. Binary -> class 1, multiclass -> class 0.
+    """Build the scalar value function every backend explains the same game on.
+
+    @model: fitted model to wrap.
+    @columns: feature column names, used to rebuild a DataFrame from raw arrays.
 
     XGBoost/LightGBM are detected via module name, not isinstance, to avoid
     importing them here — importing xgboost before shapiq segfaults shapiq's
@@ -49,22 +53,22 @@ def marginal_predict(model, columns):
     def f(X) -> np.ndarray:
         df = X if isinstance(X, pd.DataFrame) else pd.DataFrame(np.asarray(X), columns=columns)
         if type(model).__module__.startswith("xgboost") and hasattr(model, "predict_proba"):
+            # XGBClassifier -> raw margin (pre-sigmoid), not probability.
             out = np.asarray(model.predict(df, output_margin=True), dtype=float)
             return out if out.ndim == 1 else out[:, 0]
         if type(model).__module__.startswith("lightgbm") and hasattr(model, "predict_proba"):
             out = np.asarray(model.predict(df, raw_score=True), dtype=float)
             return out if out.ndim == 1 else out[:, 0]
         if hasattr(model, "decision_function"):
+            # Other classifiers with a decision_function -> log-odds margin.
             out = np.asarray(model.decision_function(df), dtype=float)
             return out if out.ndim == 1 else out[:, 0]
         if hasattr(model, "predict_proba"):
+            # Remaining classifiers -> predict_proba; class 1 if binary, else class 0.
             out = np.asarray(model.predict_proba(df))
             return out[:, 1] if out.shape[1] == 2 else out[:, 0]
+        # Regressors -> predict directly.
         out = np.asarray(model.predict(df), dtype=float)
-        # A 2D (n, 1) output would silently broadcast against the 1D
-        # contribution row-sums in the additivity metrics, turning the gap
-        # into an (n, n) matrix with a plausible-looking wrong mean. Squeeze
-        # it; a genuinely multi-output regressor has no single scalar game.
         if out.ndim == 2 and out.shape[1] == 1:
             return out[:, 0]
         if out.ndim != 1:

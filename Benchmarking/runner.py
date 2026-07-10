@@ -19,6 +19,22 @@ from .metrics import (
 from .timeout import BackendTimeout, time_limit
 
 
+def spec_key(name: str, approximator=None, budget=None) -> str:
+    """pairwise_metrics key for one run spec — single source of truth, shared
+    with scripts/recompute_pairwise_metrics.py so offline recomputes emit the
+    exact keys fresh runs do. True-value backends run once per class and keep
+    the bare backend name (merge_fasttreeshap_repair.py looks entries up by
+    name). Approximation specs can share a class (same library, different
+    approximator/budget), so the key must carry both or the specs would
+    overwrite each other's pairwise entries. Budgets are normalized through
+    int() because a CSV round-trip turns 256 into 256.0."""
+    if approximator is None or (isinstance(approximator, float) and np.isnan(approximator)):
+        return name
+    if isinstance(budget, float) and budget == int(budget):
+        budget = int(budget)
+    return f"{name}|{approximator}|{budget}"
+
+
 class BenchmarkRunner:
     """Runs all backends per (model, data) cell and emits pairwise comparison rows.
 
@@ -65,15 +81,9 @@ class BenchmarkRunner:
         else:
             X_eval = X.iloc[self.n_background:self.n_background + self.n_eval]
 
-        # Additivity check target: base + row-sum of contributions must equal
-        # f(x) (local accuracy). The base value is the backend's own reported
-        # one (backend.baseline_) when it explains a different game than the
-        # marginal one — path-dependent tree backends' base value is the
-        # cover-weighted training expectation, not mean f(background) — with
-        # mean f(background) as the fallback for marginal-game backends. So
-        # additivity_gap ~ 0 means "internally consistent Shapley decomposition"
-        # for every row, regardless of mode/order. Computed on the raw model,
-        # not a CountingModel, so it never inflates any backend's n_model_evals.
+        # Reference predictions/baseline for the additivity check, using mean
+        # f(background) as the fallback base value for marginal-game backends.
+  
         f = marginal_predict(model, X.columns)
         eval_preds = np.asarray(f(X_eval), dtype=float)
         baseline = float(np.mean(np.asarray(f(background), dtype=float)))
@@ -81,12 +91,16 @@ class BenchmarkRunner:
         # --- run every backend once, record contributions and metadata ---
         results: list[dict] = []
 
+        true_value_config = {"n_background": self.n_background}
+        if self.seed is not None:
+            true_value_config["seed"] = self.seed
+
         for cls in self.true_value_backends:
-            backend = cls(model, background)
+            backend = cls(model, background, true_value_config)
             t0 = time.perf_counter()
             try:
                 with time_limit(self.backend_timeout_s):
-                    contrib = backend.run_explainer(X_eval)
+                    contrib = cls(model, background, true_value_config).run_explainer(X_eval)
             except BackendTimeout:
                 print(f"  [SKIP] {cls.name}: exceeded {self.backend_timeout_s}s timeout")
                 contrib = self._nan_contrib(cls, X_eval)
@@ -147,6 +161,7 @@ class BenchmarkRunner:
     def _nan_contrib(cls: Type[BaseBackend], X_eval: pd.DataFrame) -> pd.DataFrame:
         return nan_result(X_eval) if cls.order == 1 else nan_interaction_result(X_eval)
 
+
     def _row(self, run_meta, candidate, all_results, eval_preds, baseline) -> dict:
         c_contrib = candidate["contrib"]
         cls = candidate["cls"]
@@ -158,7 +173,9 @@ class BenchmarkRunner:
 
         pairwise = {}
         for reference in all_results:
-            ref_name = reference["cls"].name
+            ref_config = reference["config"]
+            ref_name = spec_key(reference["cls"].name,
+                                ref_config.get("approximator"), ref_config.get("budget"))
             if candidate is reference:
                 pairwise[ref_name] = {
                     "mean_abs_diff": 0.0,

@@ -1,0 +1,73 @@
+benchmark:
+  # Single source of truth for all randomness (data subsampling, model training,
+  # and any stochastic approximator) — same meaning as configs/config.yaml's
+  # seed, required here too since slurm/run_benchmark.py reads it unconditionally.
+  seed: [0,1,2,3,4,5,6,7,8,9]
+  # Shared value function (only "marginal" is supported) — see configs/config.yaml.
+  # Tree backends don't use this directly (they use their own
+  # path-dependent/interventional distinction via tree_modes below), but it's
+  # still required since run_benchmark.py reads it unconditionally for every config.
+  imputer: marginal
+  # Reference background set for the imputer; cost scales with this.
+  n_background: 100
+  # Instances explained per (model, dataset) cell; null = explain every row.
+  n_eval: 10
+  # Wall-clock budget per (library, model, depth) true-value backend run; a
+  # backend exceeding this logs a [SKIP] and gets an all-NaN row instead of
+  # stalling the whole sweep. Deep trees (see models.*.max_depth below) can
+  # blow up tree-explainer runtime, hence the cap. null = no timeout.
+  backend_timeout_s: 600
+  # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
+  # No `backends` key either, so no model-agnostic true-value backend runs;
+  # only the tree-specific true-value backends below are used.
+  approx_backends: []
+  approximators: []
+  budgets: []
+  # Tree-specific true-value backends, only run for tree models.
+  tree_libraries: [shap_tree, shapiq_tree, woodelf, fasttreeshap]
+  tree_modes: [path_dependent, interventional]
+  # Pairwise (order-2) interactions, path-dependent only. "shap_tree" is
+  # implicit/always-on (the oracle). interaction_max_features caps d**2 output
+  # columns (quadratic — raise with care).
+  interaction_libraries: [shapiq_tree, woodelf, fasttreeshap]
+  interaction_max_features: 32
+
+# max_depth below is the cap handed to the trainer (max *allowed* depth). In
+# the results CSV, the max_depth column reports the depth the fitted model
+# actually reached; the cap is recorded separately as max_depth_config.
+models:
+  xgboost:
+    n_estimators: [100]
+    max_depth: [4, 8, 12, 15, 20, 50, 80]
+    learning_rate: [0.1]
+
+  lightgbm:
+    n_estimators: [100]
+    max_depth: [4, 8, 12, 15, 20, 50, 80]
+    learning_rate: [0.1]
+
+  random_forest:
+    n_estimators: [100]
+    max_depth: [4, 8, 12, 15, 20, 50, 80]
+
+# Same dataset grid as configs/config.yaml.
+datasets:
+  gisette:
+    n_features: [1000]
+    n_samples: [1000]
+
+  ames_housing:
+    n_features: [79]
+    n_samples: [1000]
+
+  bike:
+    n_features: [12]
+    n_samples: [1000]
+
+  diabetes_130:
+    n_features: [47]
+    n_samples: [1000]
+
+  covertype:
+    n_features: [54]
+    n_samples: [1000]

@@ -9,8 +9,8 @@ that succeeds proves the cache is complete and readable (a corrupt/partial
 cache fails too); one that hits the network block is reported as NOT CACHED.
 
 Usage (from the repo root):
-    uv run python scripts/check_dataset_cache.py                 # all configs/*.yaml
-    uv run python scripts/check_dataset_cache.py configs/config-tree.yaml ...
+    uv run python scripts/check_dataset_cache.py                 # all configs/*/*.yaml
+    uv run python scripts/check_dataset_cache.py configs/RQ4-tree/config-tree.yaml ...
 
 Exits 0 if everything is cached, 1 otherwise — safe to gate a submit on:
     uv run python scripts/check_dataset_cache.py && uv run python slurm/submit_all.py
@@ -52,7 +52,7 @@ def _dataset_keys(config_paths: list[str]) -> list[str]:
 
 
 def main() -> int:
-    config_paths = sys.argv[1:] or sorted(glob.glob(os.path.join(REPO_ROOT, "configs", "*.yaml")))
+    config_paths = sys.argv[1:] or sorted(glob.glob(os.path.join(REPO_ROOT, "configs", "*", "*.yaml")))
     if not config_paths:
         print("No configs found.", file=sys.stderr)
         return 1

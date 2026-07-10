@@ -29,8 +29,11 @@ from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
     ShapTrueValueBackend,
     ShapApproxBackend,
+    ShapIQTrueValueBackend,
     ShapIQApproxBackend,
+    LightShapExactBackend,
     LightShapApproxBackend,
+    DalexTrueBackend,
     DalexApproxBackend,
     ShapTreePathDependentBackend,
     ShapInteractionBackend,
@@ -58,11 +61,23 @@ warnings.filterwarnings(
 # future use but aren't wired in here yet (XGBoost-only, unverified on real
 # GPU hardware) — only woodelf's GPU=True path is wired below.
 
+# Approximator backends, selectable via the config's `approx_backends` list and
+# run once per (approx_backend × approximator × budget) combination.
 APPROX_MAP = {
     "shap": ShapApproxBackend,
     "shapiq": ShapIQApproxBackend,
     "lightshap": LightShapApproxBackend,
     "dalex": DalexApproxBackend,
+}
+
+# Model-agnostic true-value backends, selectable via the config's `true_backends`
+# list (accuracy-comparison configs like config-accuracy.yaml pit these against
+# each other directly, optionally alongside the approximation sweep).
+TRUE_VALUE_BACKEND_MAP = {
+    "shap_true_value": ShapTrueValueBackend,
+    "shapiq_true_value": ShapIQTrueValueBackend,
+    "lightshap_exact": LightShapExactBackend,
+    "dalex_true_value": DalexTrueBackend,
 }
 
 # Tree-specific true-value backends, only applied to tree models (Model.is_tree).
@@ -139,14 +154,23 @@ def main():
     with open(args.config) as f:
         bench = yaml.safe_load(f)["benchmark"]
 
-    imputer = bench["imputer"]
+    # `libraries`/`backends` were renamed to `approx_backends`/`true_backends`;
+    # fail loudly instead of silently running zero backends off a stale config.
+    stale = {old: new for old, new in
+             (("libraries", "approx_backends"), ("backends", "true_backends"))
+             if old in bench}
+    if stale:
+        raise ValueError(f"config uses renamed benchmark keys, update them: {stale}")
 
+    imputer = bench.get("imputer")
+
+    approximators = bench.get("approximators", [])
     approx_specs = [
         (APPROX_MAP[lib], {"approximator": appr, "budget": bgt})
-        for lib in bench["libraries"]
-        for appr in bench["approximators"]
-        for bgt in bench["budgets"]
-        if appr in getattr(APPROX_MAP[lib], "SUPPORTED_APPROXIMATORS", bench["approximators"])
+        for lib in bench.get("approx_backends", [])
+        for appr in approximators
+        for bgt in bench.get("budgets", [])
+        if appr in getattr(APPROX_MAP[lib], "SUPPORTED_APPROXIMATORS", approximators)
     ]
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -157,8 +181,20 @@ def main():
 
     model_enum = Model[mk.upper()]
 
-    # ShapTrueValueBackend must stay first: it's picked as the oracle.
-    true_value_backends = [ShapTrueValueBackend]
+    # `true_backends` selects model-agnostic true-value backends directly — only
+    # config-accuracy.yaml sets this, to pit true-value backends against each
+    # other. Every other config omits it, so no model-agnostic true-value
+    # backend runs there; those configs rely solely on their approximation
+    # sweep (approx_specs above) and/or the tree-specific true-value backends
+    # appended below.
+    backend_names = bench.get("true_backends", [])
+    unknown = [name for name in backend_names if name not in TRUE_VALUE_BACKEND_MAP]
+    if unknown:
+        raise ValueError(
+            f"Unknown true-value backend(s) in config 'true_backends': {unknown} "
+            f"(known: {list(TRUE_VALUE_BACKEND_MAP)})"
+        )
+    true_value_backends = [TRUE_VALUE_BACKEND_MAP[name] for name in backend_names]
     if model_enum.is_tree:
         for lib in bench.get("tree_libraries", []):
             for mode in bench.get("tree_modes", []):
