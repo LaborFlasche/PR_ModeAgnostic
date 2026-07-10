@@ -48,15 +48,22 @@ def marginal_predict(model, columns):
     margin — but it has no decision_function, so without raw_score=True it would
     fall through to predict_proba and the additivity metrics would compare
     margin-space Shapley sums against probability-space predictions.
+
+    The module-name check is done on ``model._model`` when present (e.g.
+    ``CountingModel``, whose whole point is to proxy calls through so they get
+    counted) because ``type(proxy).__module__`` reflects the proxy's own class,
+    not the wrapped model's — checking the proxy directly would always miss the
+    xgboost/lightgbm branches and silently fall through to predict_proba.
     """
 
     def f(X) -> np.ndarray:
         df = X if isinstance(X, pd.DataFrame) else pd.DataFrame(np.asarray(X), columns=columns)
-        if type(model).__module__.startswith("xgboost") and hasattr(model, "predict_proba"):
+        real_model = getattr(model, "_model", model)
+        if type(real_model).__module__.startswith("xgboost") and hasattr(model, "predict_proba"):
             # XGBClassifier -> raw margin (pre-sigmoid), not probability.
             out = np.asarray(model.predict(df, output_margin=True), dtype=float)
             return out if out.ndim == 1 else out[:, 0]
-        if type(model).__module__.startswith("lightgbm") and hasattr(model, "predict_proba"):
+        if type(real_model).__module__.startswith("lightgbm") and hasattr(model, "predict_proba"):
             out = np.asarray(model.predict(df, raw_score=True), dtype=float)
             return out if out.ndim == 1 else out[:, 0]
         if hasattr(model, "decision_function"):
