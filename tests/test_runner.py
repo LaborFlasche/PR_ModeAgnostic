@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -41,8 +43,9 @@ def test_csv_has_correct_columns(runner):
     bench.run(model, X, run_meta={"dataset": "test_ds", "model": "rf", "n_features": 4, "n_samples": 120})
     df = pd.read_csv(bench.output_csv)
     expected = {"dataset", "model", "n_features", "n_samples", "backend", "library",
-                "computation_type", "n_eval", "runtime_s", "mean_abs_diff",
-                "sign_agreement", "mean_sample_rho", "reference_backend"}
+                "computation_type", "n_eval", "runtime_s", "n_model_evals",
+                "additivity_gap", "relative_additivity_gap", "shapley_values",
+                "shapley_n_eval", "shapley_n_features", "pairwise_metrics"}
     assert expected.issubset(set(df.columns))
 
 
@@ -62,22 +65,27 @@ def test_csv_appends_on_second_run(runner):
     assert len(df) == 4  # 2 backends × 2 runs
 
 
-def test_shap_reference_is_nan(runner):
+def test_pairwise_self_comparison_is_exact(runner):
     bench, model, X = runner
     bench.run(model, X, run_meta={"dataset": "test_ds", "model": "rf", "n_features": 4, "n_samples": 120})
     df = pd.read_csv(bench.output_csv)
     shap_row = df[df["backend"] == "shap_true_value"].iloc[0]
-    assert pd.isna(shap_row["reference_backend"])
-    assert pd.isna(shap_row["mean_abs_diff"])
+    self_metrics = json.loads(shap_row["pairwise_metrics"])["shap_true_value"]
+    assert self_metrics["mean_abs_diff"] == 0.0
+    assert self_metrics["relative_mae"] == 0.0
+    assert self_metrics["mean_sample_rho"] == 1.0
 
 
-def test_shapiq_reference_is_shap(runner):
+def test_pairwise_metrics_cover_every_backend(runner):
     bench, model, X = runner
     bench.run(model, X, run_meta={"dataset": "test_ds", "model": "rf", "n_features": 4, "n_samples": 120})
     df = pd.read_csv(bench.output_csv)
     shapiq_row = df[df["backend"] == "shapiq_true_value"].iloc[0]
-    assert shapiq_row["reference_backend"] == "shap_true_value"
-    assert not pd.isna(shapiq_row["mean_abs_diff"])
+    pairwise = json.loads(shapiq_row["pairwise_metrics"])
+    assert set(pairwise) == {"shap_true_value", "shapiq_true_value"}
+    vs_shap = pairwise["shap_true_value"]
+    assert np.isfinite(vs_shap["mean_abs_diff"])
+    assert np.isfinite(vs_shap["mean_sample_rho"])
 
 
 def test_n_eval_limits_explained_samples(tmp_path, toy_rf_data):
