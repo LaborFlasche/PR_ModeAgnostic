@@ -65,10 +65,15 @@ class BenchmarkRunner:
         else:
             X_eval = X.iloc[self.n_background:self.n_background + self.n_eval]
 
-        # Additivity check target: every backend explains the same marginal
-        # value function f, so baseline + row-sum of contributions must equal
-        # f(x) (local accuracy). Computed on the raw model, not a
-        # CountingModel, so it never inflates any backend's n_model_evals.
+        # Additivity check target: base + row-sum of contributions must equal
+        # f(x) (local accuracy). The base value is the backend's own reported
+        # one (backend.baseline_) when it explains a different game than the
+        # marginal one — path-dependent tree backends' base value is the
+        # cover-weighted training expectation, not mean f(background) — with
+        # mean f(background) as the fallback for marginal-game backends. So
+        # additivity_gap ~ 0 means "internally consistent Shapley decomposition"
+        # for every row, regardless of mode/order. Computed on the raw model,
+        # not a CountingModel, so it never inflates any backend's n_model_evals.
         f = marginal_predict(model, X.columns)
         eval_preds = np.asarray(f(X_eval), dtype=float)
         baseline = float(np.mean(np.asarray(f(background), dtype=float)))
@@ -77,10 +82,11 @@ class BenchmarkRunner:
         results: list[dict] = []
 
         for cls in self.true_value_backends:
+            backend = cls(model, background)
             t0 = time.perf_counter()
             try:
                 with time_limit(self.backend_timeout_s):
-                    contrib = cls(model, background).run_explainer(X_eval)
+                    contrib = backend.run_explainer(X_eval)
             except BackendTimeout:
                 print(f"  [SKIP] {cls.name}: exceeded {self.backend_timeout_s}s timeout")
                 contrib = self._nan_contrib(cls, X_eval)
@@ -94,6 +100,7 @@ class BenchmarkRunner:
                 "contrib": contrib,
                 "runtime": runtime,
                 "n_model_evals": float("nan"),
+                "baseline": backend.baseline_,
             })
 
         for cls, config in self.approximation_specs:
@@ -109,9 +116,10 @@ class BenchmarkRunner:
             # all-NaN row instead of killing the whole (model, dataset) cell.
             # A timed-out row records runtime_s ~= the timeout (right-censored)
             # — filter NaN-value rows out of mean-runtime aggregations.
+            backend = cls(counter, background, run_config)
             try:
                 with time_limit(self.backend_timeout_s):
-                    contrib = cls(counter, background, run_config).run_explainer(X_eval)
+                    contrib = backend.run_explainer(X_eval)
             except BackendTimeout:
                 print(f"  [SKIP] {cls.name} ({config}): exceeded {self.backend_timeout_s}s timeout")
                 contrib = nan_result(X_eval)
@@ -125,6 +133,7 @@ class BenchmarkRunner:
                 "contrib": contrib,
                 "runtime": runtime,
                 "n_model_evals": counter.n_rows,
+                "baseline": backend.baseline_,
             })
 
         # --- emit one row per backend with pairwise metrics dict ---
@@ -142,7 +151,10 @@ class BenchmarkRunner:
         c_contrib = candidate["contrib"]
         cls = candidate["cls"]
         config = candidate["config"]
-        gap = additivity_gap(c_contrib, eval_preds, baseline)
+        # The backend's own game's base value when reported (path-dependent tree
+        # backends), else the marginal game's (mean f over the background).
+        base = candidate["baseline"] if candidate["baseline"] is not None else baseline
+        gap = additivity_gap(c_contrib, eval_preds, base)
 
         pairwise = {}
         for reference in all_results:
@@ -175,8 +187,9 @@ class BenchmarkRunner:
             "n_eval": len(c_contrib),
             "runtime_s": round(candidate["runtime"], 4),
             "n_model_evals": candidate["n_model_evals"],
+            "base_value": base,
             "additivity_gap": gap,
-            "relative_additivity_gap": relative_additivity_gap(c_contrib, eval_preds, baseline, gap=gap),
+            "relative_additivity_gap": relative_additivity_gap(c_contrib, eval_preds, base, gap=gap),
             "shapley_values": json.dumps(c_contrib.values.flatten().tolist()),
             "shapley_n_eval": c_contrib.shape[0],
             "shapley_n_features": c_contrib.shape[1],

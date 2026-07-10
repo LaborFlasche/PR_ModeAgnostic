@@ -30,7 +30,10 @@ def main():
     # Model hyperparameters (e.g. max_depth swept in configs/config-tree.yaml) are part
     # of the identity key too, so different values don't collapse into one row. Only
     # included if present, since non-tree configs' models don't share these param names.
-    hyperparam_cols = [c for c in ("n_estimators", "max_depth", "learning_rate") if c in df.columns]
+    # max_depth_config (the configured cap) matters here: max_depth holds the depth the
+    # fitted model actually reached, and two different caps can grow the same tree.
+    hyperparam_cols = [c for c in ("n_estimators", "max_depth", "max_depth_config", "learning_rate")
+                       if c in df.columns]
     df = df.drop_duplicates(
         subset=["dataset", "model", "n_features", "n_samples", "seed", "n_background",
                 "backend", "approximator", "budget"] + hyperparam_cols,

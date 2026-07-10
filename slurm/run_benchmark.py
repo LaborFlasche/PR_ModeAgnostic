@@ -24,7 +24,7 @@ import yaml
 from sklearn.model_selection import ParameterGrid
 
 from Models.config_parser import load_config, load_dataset_config, as_list
-from Models.dataset_and_models import Dataset, Model
+from Models.dataset_and_models import Dataset, Model, actual_max_depth
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
     ShapTrueValueBackend,
@@ -171,6 +171,14 @@ def main():
     trainer = model_enum.get_model_with_params(dataset_enum, mp, seed=seed)
     trainer.fit(ds["X"], ds["y"], task=ds["task"])
 
+    # For tree models the CSV's max_depth column reports the depth the fitted
+    # model actually reached; the configured cap moves to max_depth_config
+    # (kept because two caps can grow the exact same tree — see merge_results.py).
+    base_meta = {"dataset": dk, "model": mk, "n_background": n_background, **dp, **mp}
+    if model_enum.is_tree:
+        base_meta["max_depth_config"] = mp.get("max_depth")
+        base_meta["max_depth"] = actual_max_depth(trainer.get_model())
+
     runner = BenchmarkRunner(
         true_value_backends=true_value_backends,
         approximation_specs=approx_specs,
@@ -185,7 +193,7 @@ def main():
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta={"dataset": dk, "model": mk, "order": 1, "n_background": n_background, **dp, **mp},
+        run_meta={**base_meta, "order": 1},
     )
 
     # Pairwise interactions: a separate runner.run() call (different oracle,
@@ -217,7 +225,7 @@ def main():
             interaction_runner.run(
                 model=trainer.get_model(),
                 X=ds["X"],
-                run_meta={"dataset": dk, "model": mk, "order": 2, "n_background": n_background, **dp, **mp},
+                run_meta={**base_meta, "order": 2},
             )
 
     print(f"[task {args.task_id}] done -> {output_csv}")
