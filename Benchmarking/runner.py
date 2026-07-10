@@ -81,15 +81,9 @@ class BenchmarkRunner:
         else:
             X_eval = X.iloc[self.n_background:self.n_background + self.n_eval]
 
-        # Additivity check target: base + row-sum of contributions must equal
-        # f(x) (local accuracy). The base value is the backend's own reported
-        # one (backend.baseline_) when it explains a different game than the
-        # marginal one — path-dependent tree backends' base value is the
-        # cover-weighted training expectation, not mean f(background) — with
-        # mean f(background) as the fallback for marginal-game backends. So
-        # additivity_gap ~ 0 means "internally consistent Shapley decomposition"
-        # for every row, regardless of mode/order. Computed on the raw model,
-        # not a CountingModel, so it never inflates any backend's n_model_evals.
+        # Reference predictions/baseline for the additivity check, using mean
+        # f(background) as the fallback base value for marginal-game backends.
+  
         f = marginal_predict(model, X.columns)
         eval_preds = np.asarray(f(X_eval), dtype=float)
         baseline = float(np.mean(np.asarray(f(background), dtype=float)))
@@ -102,7 +96,7 @@ class BenchmarkRunner:
             true_value_config["seed"] = self.seed
 
         for cls in self.true_value_backends:
-            backend = cls(model, background)
+            backend = cls(model, background, true_value_config)
             t0 = time.perf_counter()
             try:
                 with time_limit(self.backend_timeout_s):
