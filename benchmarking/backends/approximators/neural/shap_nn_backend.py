@@ -4,11 +4,11 @@ import shap
 import torch
 import torch.nn as nn
 
-from ..base_backend import BaseBackend, nan_result
+from ...base_backend import BaseBackend, nan_result
 
 
 def _unwrap_torch_model(model):
-    from ..eval_counter import CountingModel
+    from ...eval_counter import CountingModel
     if isinstance(model, CountingModel):
         return model._model
     return model

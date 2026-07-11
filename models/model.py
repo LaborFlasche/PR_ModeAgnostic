@@ -15,12 +15,8 @@ from sklearn.tree import (
 )
 # xgboost/lightgbm are imported lazily below (not at module level): importing
 # xgboost before shapiq segfaults shapiq's interventional TreeExplainer later —
-# see trees/shapiq_backend.py.
-
-# The Dataset enum (and its DatasetSpec-based loading) lives in one place —
-# datasets/load_datasets.py — and is re-exported here so existing imports
-# (`from models.dataset_and_models import Dataset, Model`) keep working.
-from datasets.load_datasets import Dataset  # noqa: F401  (re-export)
+# see benchmarking/backends/true_value/trees/shapiq_backend.py.
+from datasets.load_datasets import Dataset
 
 from models.trainers import SklearnTrainer, PytorchTrainer
 from enum import Enum

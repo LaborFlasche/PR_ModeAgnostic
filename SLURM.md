@@ -107,7 +107,7 @@ are added):
 cd ~/PR_ModeAgnostic
 uv run python - <<'EOF'
 import glob, yaml
-from models.dataset_and_models import Dataset
+from datasets.load_datasets import Dataset
 
 seen = set()
 for cfg_path in sorted(glob.glob("configs/*/*.yaml")):
@@ -340,20 +340,19 @@ configs/
 benchmarking/
 ├── runner.py             ← BenchmarkRunner — oracle + approximators per cell
 ├── metrics.py             ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
-├── backends/               ← approximators/, trees/, true_value/ — one class per (library, mode)
+├── config.py              ← load_config / load_dataset_config — expand a config.yaml into parameter lists
+├── backends/               ← true_value/{tabular,trees}, approximators/{tabular,neural} — one class per (library, mode)
 ├── results_<config_name>.csv  ← merged results per config (after step 5/7)
 └── slurm_results/
     └── <config_name>/          ← per-task CSVs, one dir per config (gitignored)
 
 models/
-├── dataset_and_models.py ← Dataset/Model enums; Model.is_tree gates the tree-specific sweep
-├── config_parser.py      ← load_config / load_dataset_config — expand a config.yaml into parameter lists
+├── model.py              ← Model enum; Model.is_tree gates the tree-specific sweep
 ├── architectures.py      ← neural network architectures
 └── trainers.py            ← SklearnTrainer / PytorchTrainer
 
 datasets/
 └── load_datasets.py      ← dataset download/caching helpers (used by step 3); Dataset enum lives here
-                             and is re-exported from models/dataset_and_models.py
 
 scripts/
 ├── check_dataset_cache.py         ← verifies datasets are cached offline (step 3)

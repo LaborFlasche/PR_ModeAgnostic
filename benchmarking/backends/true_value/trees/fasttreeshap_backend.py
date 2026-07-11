@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..base_backend import BaseBackend, nan_result, nan_interaction_result
+from ...base_backend import BaseBackend, nan_result, nan_interaction_result
 
 _RUNNER_SCRIPT = Path(__file__).parent / "_fasttreeshap_runner.py"
 _DEFAULT_VENV_PYTHON = str(Path.home() / ".cache" / "pr-modeagnostic" / ".venv-fasttreeshap" / "bin" / "python")

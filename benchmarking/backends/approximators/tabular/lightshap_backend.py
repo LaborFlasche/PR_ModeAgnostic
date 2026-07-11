@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from lightshap import explain_any
 
-from ..base_backend import BaseBackend, marginal_predict
+from ...base_backend import BaseBackend, marginal_predict
 
 
 class LightShapApproxBackend(BaseBackend):

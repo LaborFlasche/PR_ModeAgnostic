@@ -15,8 +15,8 @@ from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassif
 from sklearn.tree import DecisionTreeClassifier
 
 from benchmarking.backends.base_backend import marginal_predict
-from benchmarking.backends.trees.shapiq_backend import _class_index
-from benchmarking.backends.trees.woodelf_backend import _woodelf_class_sign_is_flipped
+from benchmarking.backends.true_value.trees.shapiq_backend import _class_index
+from benchmarking.backends.true_value.trees.woodelf_backend import _woodelf_class_sign_is_flipped
 
 
 @pytest.fixture(scope="module")

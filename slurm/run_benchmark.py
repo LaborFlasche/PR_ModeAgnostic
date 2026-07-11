@@ -23,8 +23,9 @@ import lightgbm  # noqa: F401,E402  isort:skip
 import yaml
 from sklearn.model_selection import ParameterGrid
 
-from models.config_parser import load_config, load_dataset_config, as_list
-from models.dataset_and_models import Dataset, Model, actual_max_depth
+from benchmarking.config import load_config, load_dataset_config, as_list
+from datasets.load_datasets import Dataset
+from models.model import Model, actual_max_depth
 from benchmarking import BenchmarkRunner
 from benchmarking.backends import (
     ShapTrueValueBackend,

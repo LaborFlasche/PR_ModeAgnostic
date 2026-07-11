@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import shap
 
-from ..base_backend import BaseBackend, marginal_predict
+from ...base_backend import BaseBackend, marginal_predict
 
 
 class ShapApproxBackend(BaseBackend):

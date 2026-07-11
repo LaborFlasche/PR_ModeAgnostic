@@ -24,8 +24,9 @@ warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", categ
 import yaml
 from sklearn.model_selection import ParameterGrid
 
-from models.config_parser import load_config, load_dataset_config, as_list
-from models.dataset_and_models import Dataset, Model
+from benchmarking.config import load_config, load_dataset_config, as_list
+from datasets.load_datasets import Dataset
+from models.model import Model
 from benchmarking import BenchmarkRunner
 from benchmarking.backends import (
     ShapIQTrueValueBackend,

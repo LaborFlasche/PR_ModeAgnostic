@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import shapiq
 
-from ..base_backend import BaseBackend, flatten_interactions
+from ...base_backend import BaseBackend, flatten_interactions
 
 
 def _class_index(model) -> int:

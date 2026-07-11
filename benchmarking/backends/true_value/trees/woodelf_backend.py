@@ -2,7 +2,7 @@ import pandas as pd
 import shap
 from woodelf import WoodelfExplainer
 
-from ..base_backend import (
+from ...base_backend import (
     BaseBackend,
     nan_result,
     nan_interaction_result,

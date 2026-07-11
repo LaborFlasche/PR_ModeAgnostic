@@ -8,7 +8,8 @@ import lightgbm  # noqa: F401  isort:skip
 import pytest
 from sklearn.datasets import make_regression
 
-from models.dataset_and_models import Dataset, Model, actual_max_depth
+from datasets.load_datasets import Dataset
+from models.model import Model, actual_max_depth
 
 TREE_MODELS = [m for m in Model if m.is_tree]
 

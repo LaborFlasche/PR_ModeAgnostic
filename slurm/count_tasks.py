@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import yaml
 from sklearn.model_selection import ParameterGrid
-from models.config_parser import load_config, load_dataset_config, as_list
+from benchmarking.config import load_config, load_dataset_config, as_list
 
 if len(sys.argv) != 2:
     print("Usage: python slurm/count_tasks.py <config.yaml>", file=sys.stderr)

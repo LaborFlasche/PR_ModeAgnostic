@@ -1,7 +1,7 @@
 import dalex
 import pandas as pd
 
-from ..base_backend import BaseBackend, marginal_predict
+from ...base_backend import BaseBackend, marginal_predict
 
 
 class DalexApproxBackend(BaseBackend):

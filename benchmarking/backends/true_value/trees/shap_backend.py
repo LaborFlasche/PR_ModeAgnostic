@@ -1,7 +1,7 @@
 import pandas as pd
 import shap
 
-from ..base_backend import BaseBackend, reduce_multiclass, flatten_interactions, select_base_value
+from ...base_backend import BaseBackend, reduce_multiclass, flatten_interactions, select_base_value
 
 
 class ShapTreePathDependentBackend(BaseBackend):

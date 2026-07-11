@@ -27,7 +27,7 @@ sys.path.insert(0, REPO_ROOT)
 
 import yaml
 from sklearn.model_selection import ParameterGrid
-from models.config_parser import load_config, load_dataset_config, as_list
+from benchmarking.config import load_config, load_dataset_config, as_list
 
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls

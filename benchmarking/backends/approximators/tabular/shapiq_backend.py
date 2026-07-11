@@ -1,7 +1,7 @@
 import pandas as pd
 import shapiq
 
-from ..base_backend import BaseBackend, marginal_predict
+from ...base_backend import BaseBackend, marginal_predict
 
 
 class ShapIQApproxBackend(BaseBackend):
