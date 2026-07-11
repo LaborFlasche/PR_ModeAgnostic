@@ -38,15 +38,10 @@ from benchmarking.metrics import (  # noqa: E402
     sign_agreement,
     mean_sample_rho,
 )
-from benchmarking.runner import spec_key  # noqa: E402
+from benchmarking.runner import spec_key, RUN_OUTPUT_COLUMNS  # noqa: E402
 
-# Per-backend output columns (same split as slurm/merge_results.py); everything
-# else identifies the cell, except the trio naming the spec within it.
-OUTPUT_COLS = {
-    "library", "computation_type", "n_eval", "runtime_s", "n_model_evals",
-    "additivity_gap", "relative_additivity_gap", "shapley_values",
-    "shapley_n_eval", "shapley_n_features", "pairwise_metrics",
-}
+# Everything besides RUN_OUTPUT_COLUMNS identifies the cell, except the trio
+# naming the spec within it.
 ROW_ID_COLS = {"backend", "approximator", "budget"}
 
 
@@ -96,7 +91,7 @@ def recompute(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Return a copy of df with pairwise_metrics rebuilt for all order-1 cells,
     plus a report dict (cells/rows processed, self-check max deviation)."""
     df = df.copy()
-    cell_cols = [c for c in df.columns if c not in OUTPUT_COLS | ROW_ID_COLS]
+    cell_cols = [c for c in df.columns if c not in RUN_OUTPUT_COLUMNS | ROW_ID_COLS]
     report = {"cells": 0, "rows": 0, "skipped_order2": 0, "max_deviation": 0.0}
 
     for _, cell in df.groupby(cell_cols, dropna=False):

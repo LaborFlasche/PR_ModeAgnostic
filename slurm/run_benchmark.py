@@ -20,10 +20,7 @@ import warnings
 import xgboost  # noqa: F401,E402  isort:skip
 import lightgbm  # noqa: F401,E402  isort:skip
 
-import yaml
-from sklearn.model_selection import ParameterGrid
-
-from benchmarking.config import load_config, load_dataset_config, as_list
+from slurm.task_grid import build_all_runs, load_bench
 from datasets.load_datasets import Dataset
 from models.model import Model, actual_max_depth
 from benchmarking import BenchmarkRunner
@@ -111,28 +108,6 @@ INTERACTION_TRUE_VALUE_MAP = {
 }
 
 
-def build_all_runs(config_path: str) -> list[tuple]:
-    """Every independent benchmark cell for a config, as (seed, dataset,
-    dataset_params, model, model_params, n_background) tuples — one per SLURM array
-    task. ``seed`` and ``n_background`` may each be a scalar or a list and are swept
-    as extra grid dimensions (see as_list)."""
-    model_config = load_config(config_path)
-    dataset_config = load_dataset_config(config_path)
-    with open(config_path) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    seeds = as_list(bench["seed"])
-    model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
-    dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
-    n_backgrounds = as_list(bench["n_background"])
-    return [
-        (seed, dk, dp, mk, mp, n_bg)
-        for seed in seeds
-        for dk, dp in dataset_runs
-        for mk, mp in model_runs
-        for n_bg in n_backgrounds
-    ]
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
@@ -152,8 +127,7 @@ def main():
     print(f"[task {args.task_id}] dataset={dk} {dp} | model={mk} {mp} "
           f"| seed={seed} | n_background={n_background}")
 
-    with open(args.config) as f:
-        bench = yaml.safe_load(f)["benchmark"]
+    bench = load_bench(args.config)
 
     # `libraries`/`backends` were renamed to `approx_backends`/`true_backends`;
     # fail loudly instead of silently running zero backends off a stale config.

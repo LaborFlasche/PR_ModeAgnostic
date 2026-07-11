@@ -20,14 +20,11 @@ import os
 import subprocess
 import sys
 import time
-from collections import defaultdict
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-import yaml
-from sklearn.model_selection import ParameterGrid
-from benchmarking.config import load_config, load_dataset_config, as_list
+from slurm.task_grid import build_all_runs
 
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls
@@ -85,18 +82,9 @@ CONFIG_REGISTRY = {
 # ---------------------------------------------------------------------------
 
 def count_tasks(config_path: str) -> int:
-    """Must match the task grid built by build_all_runs in slurm/run_benchmark.py
-    and slurm/run_benchmark_nn.py: seed and n_background are swept as extra grid
-    dimensions (scalar or list), same as slurm/count_tasks.py. Counting only
-    models × datasets previously submitted just the first slice of the grid
-    (seed is the outermost loop) and silently dropped every other seed."""
-    model_runs = [p for pg in load_config(config_path).values() for p in ParameterGrid(pg)]
-    dataset_runs = [p for pg in load_dataset_config(config_path).values() for p in ParameterGrid(pg)]
-    with open(os.path.join(REPO_ROOT, config_path)) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    n_seeds = len(as_list(bench["seed"]))
-    n_backgrounds = len(as_list(bench["n_background"]))
-    return len(model_runs) * len(dataset_runs) * n_seeds * n_backgrounds
+    """Number of SLURM array tasks for a config — must match the task grid the
+    workers (run_benchmark.py, run_benchmark_nn.py) index into via --task-id."""
+    return len(build_all_runs(config_path))
 
 
 # ---------------------------------------------------------------------------

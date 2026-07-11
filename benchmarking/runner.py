@@ -19,6 +19,17 @@ from .metrics import (
 from .timeout import BackendTimeout, time_limit
 
 
+# Per-run output columns emitted by _row, as opposed to columns that identify
+# a cell/row (run_meta, backend, approximator, budget, seed, ...). Shared with
+# slurm/merge_results.py (identifies dedup key) and
+# scripts/recompute_pairwise_metrics.py (identifies cell-grouping key).
+RUN_OUTPUT_COLUMNS = {
+    "library", "computation_type", "n_eval", "runtime_s", "n_model_evals",
+    "additivity_gap", "relative_additivity_gap", "shapley_values",
+    "shapley_n_eval", "shapley_n_features", "pairwise_metrics",
+}
+
+
 def spec_key(name: str, approximator=None, budget=None) -> str:
     """pairwise_metrics key for one run spec — single source of truth, shared
     with scripts/recompute_pairwise_metrics.py so offline recomputes emit the

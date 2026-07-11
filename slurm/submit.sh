@@ -9,6 +9,7 @@
 set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
+source slurm/select_array_script.sh
 
 CONFIG="$1"
 if [ -z "$CONFIG" ]; then
@@ -25,22 +26,11 @@ CONFIG_NAME="$(basename "$CONFIG" .yaml)"
 OUTPUT_DIR="benchmarking/slurm_results/$CONFIG_NAME"
 MERGED_CSV="benchmarking/results_$CONFIG_NAME.csv"
 
-# Pick the array script once: NN configs use run_benchmark_nn.py, GPU configs
-# (name contains "gpu", e.g. configs/RQ5-gpu/config-tree-gpu.yaml) need a GPU node
-# (--gres=gpu:1, NvidiaAll partition — see slurm/bench_array_gpu.sh), everything
-# else runs the CPU array script. Must stay a single if/elif chain: two separate
-# assignments previously let the CPU branch silently overwrite the GPU choice.
-if [[ "$CONFIG" == *neural-networks* ]]; then
-    ARRAY_SCRIPT="slurm/bench_array_nn.sh"
-elif [[ "$CONFIG_NAME" == *gpu* ]]; then
-    ARRAY_SCRIPT="slurm/bench_array_gpu.sh"
-else
-    ARRAY_SCRIPT="slurm/bench_array.sh"
-fi
+ARRAY_SCRIPT="$(select_array_script "$CONFIG")"
 
 # Count (dataset × model) combinations from the config
 N=$(~/.local/bin/uv run python slurm/count_tasks.py "$CONFIG")
-echo "Submitting $N array tasks for config=$CONFIG..."
+echo "Submitting $N array tasks for config=$CONFIG (via $ARRAY_SCRIPT)..."
 
 mkdir -p slurm/logs "$OUTPUT_DIR"
 

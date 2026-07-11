@@ -21,10 +21,7 @@ warnings.filterwarnings("ignore", message="Not all budget.*", category=UserWarni
 warnings.filterwarnings("ignore", message="The sample size is larger.*", category=UserWarning, module="shapiq")
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
-import yaml
-from sklearn.model_selection import ParameterGrid
-
-from benchmarking.config import load_config, load_dataset_config, as_list
+from slurm.task_grid import build_all_runs, load_bench
 from datasets.load_datasets import Dataset
 from models.model import Model
 from benchmarking import BenchmarkRunner
@@ -88,28 +85,6 @@ def build_run_meta(*, dataset: str, dataset_params: dict, model: str,
             **dataset_params, **mp_meta}
 
 
-def build_all_runs(config_path: str) -> list[tuple]:
-    """Every independent benchmark cell as (seed, dataset, dataset_params, model,
-    model_params, n_background) tuples — same shape and sweep order as
-    slurm/run_benchmark.py's build_all_runs, so count_tasks.py counts both alike.
-    ``seed`` and ``n_background`` may each be a scalar or a list."""
-    model_config = load_config(config_path)
-    dataset_config = load_dataset_config(config_path)
-    with open(config_path) as f:
-        bench = yaml.safe_load(f)["benchmark"]
-    seeds = as_list(bench["seed"])
-    model_runs = [(k, p) for k, pg in model_config.items() for p in ParameterGrid(pg)]
-    dataset_runs = [(k, p) for k, pg in dataset_config.items() for p in ParameterGrid(pg)]
-    n_backgrounds = as_list(bench["n_background"])
-    return [
-        (seed, dk, dp, mk, mp, n_bg)
-        for seed in seeds
-        for dk, dp in dataset_runs
-        for mk, mp in model_runs
-        for n_bg in n_backgrounds
-    ]
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
@@ -127,8 +102,7 @@ def main():
     print(f"[task {args.task_id}] dataset={dk} {dp} | model={mk} {mp} "
           f"| seed={seed} | n_background={n_background}")
 
-    with open(args.config) as f:
-        bench = yaml.safe_load(f)["benchmark"]
+    bench = load_bench(args.config)
 
     imputer = bench["imputer"]
 
