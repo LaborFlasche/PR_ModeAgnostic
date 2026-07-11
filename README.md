@@ -24,17 +24,19 @@ Wired into the automated `benchmarking/` pipeline (`slurm/run_benchmark.py` and 
 
 ## Datasets
 
-Stored in `datasets/`. See `datasets/README.md` for full details on feature encoding and the feature-selection strategy used for experiments.
+Registered in `datasets/load_datasets.py` (`Dataset` enum). See `datasets/README.md` for full details on feature encoding and the feature-selection strategy used for experiments.
 
-| Dataset | Task | Samples | Features | Source |
-|---|---|---|---|---|
-| California Housing | Regression | 20,640 | 8 | `sklearn.datasets` |
-| Ames Housing | Regression | 1,460 | ~79 | OpenML #42165 |
-| Forest Covertype | Classification | 50,000* | 54 | `sklearn.datasets` |
-| Adult Census | Classification | 48,842 | 14 | OpenML #1590 |
-| Gisette | Classification | 7,000 | 5,000 | OpenML #41026 |
+| Dataset | Config key | Task | Samples | Features | Source |
+|---|---|---|---|---|---|
+| Bike Sharing | `bike` | Regression | 17,379 | 12 | OpenML #42712 |
+| Ames Housing | `ames_housing` | Regression | 1,460 | ~79 | OpenML #42165 |
+| Diabetes 130-US | `diabetes_130` | Classification | 101,766 | 47 | OpenML #46922 |
+| Forest Covertype | `covertype` | Classification | 50,000* | 54 | `sklearn.datasets` |
+| Gisette | `gisette` | Classification | 7,000 | 5,000 | OpenML #41026 |
 
 \* Stratified subsample of the full 581k-row dataset for faster experimentation.
+
+These five are the ones used by the current configs. The registry also carries California Housing, Adult Census, QSAR Biodegradation, and Bankruptcy as ready-to-use alternates — see `datasets/README.md` for the full table.
 
 ## Benchmark configuration
 
@@ -86,7 +88,7 @@ ds = Dataset[dataset_key.upper()].load_dataset(**dataset_params, seed=seed)
 X, y = ds["X"], ds["y"]
 ```
 
-Features within each dataset are reduced by ranking on variance (`VarianceThreshold`) and keeping the top `n_features`; samples are drawn randomly with `random_state=42`.
+Features within each dataset are reduced by ranking on variance and keeping the top `n_features`; samples are subsampled with the benchmark-wide seed (stratified by class for classification tasks, random for regression).
 
 ## Tree-specific benchmark
 
@@ -149,6 +151,7 @@ backends/                    # one BaseBackend subclass per (library, mode) — 
     tabular/                 # shap, shapiq, lightshap, dalex — model-agnostic approximators
     neural/                  # captum, shap_nn, shapiq_nn — gradient-based, PyTorch-only
 benchmarking/                # the harness that runs backends/ over models/ + datasets/ and scores the result
+  README.md                 # runner design notes + how to add a new backend
   runner.py                 # BenchmarkRunner — runs one oracle + backends/approximations per cell
   metrics.py                # mean_abs_diff, sign_agreement, mean_sample_rho, additivity gaps
   eval_counter.py           # CountingModel — counts real model evaluations per backend
@@ -164,8 +167,15 @@ datasets/
 configs/
   RQ1-accuracy/ … RQ5-gpu/  # one self-contained config per research question — see "Benchmark configuration" above
 slurm/                      # SLURM array-job scripts; see SLURM.md
+  run_benchmark.py          # entry point: one (dataset, model) cell per invocation (tabular + tree)
+  run_benchmark_nn.py       # entry point for the neural-network sweep (captum, shap_nn, shapiq_nn)
+  submit_all.py             # queues all RQ configs, respecting the cluster's 30-job limit
+  merge_results.py          # merges per-task CSVs into one results CSV
 scripts/
   setup_fasttreeshap_env.sh # Provisions the dedicated venv fasttreeshap runs in (numpy<2)
+  check_dataset_cache.py    # Verifies every dataset used by the configs is fully cached
+  recompute_pairwise_metrics.py # Rebuilds pairwise_metrics from stored shapley_values vectors
+  merge_fasttreeshap_repair.py  # Merges the fasttreeshap repair sweep back into the tree results CSV
 tests/                      # pytest suite for backends, runner, and metrics
 pyproject.toml              # Project metadata and dependencies
 uv.lock                     # Locked dependency versions (commit this)
