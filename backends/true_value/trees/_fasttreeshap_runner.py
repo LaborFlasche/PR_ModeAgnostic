@@ -16,7 +16,7 @@ import pandas as pd
 
 
 def reduce_multiclass(values, order=1):
-    """Mirrors benchmarking/backends/base_backend.py's reduce_multiclass — kept as a
+    """Mirrors backends/base_backend.py's reduce_multiclass — kept as a
     local copy since this script must stay import-free of the benchmarking package
     (see module docstring)."""
     if isinstance(values, list):

@@ -6,12 +6,13 @@ Compares Shapley-value XAI backends on runtime and accuracy across model × data
 
 ## Add a New Backend
 
-1. Create a new file, e.g. `benchmarking/backends/captum_backend.py`
+1. Create a new file under the matching subpackage, e.g. `backends/approximators/neural/captum_backend.py`
+   (`true_value/` vs `approximators/`, then `tabular/`/`trees/`/`neural/` — see `backends/`'s layout)
 2. Subclass `BaseBackend`:
 
 ```python
 import pandas as pd
-from benchmarking.backends.base_backend import BaseBackend, marginal_predict
+from backends.base_backend import BaseBackend, marginal_predict
 
 class CaptumApproxBackend(BaseBackend):
     name = "captum_approx"    # unique string key, appears in CSV
@@ -35,7 +36,7 @@ class CaptumApproxBackend(BaseBackend):
         return pd.DataFrame(attributions, index=x.index, columns=x.columns)
 ```
 
-3. Register in `benchmarking/backends/__init__.py`.
+3. Register in `backends/__init__.py`.
 
 4. Add it to the runner's `approximation_specs` as `(CaptumApproxBackend, {"approximator": ..., "budget": ...})` (see below).
 

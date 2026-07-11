@@ -14,9 +14,9 @@ from sklearn.datasets import make_classification
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier, RandomForestRegressor
 from sklearn.tree import DecisionTreeClassifier
 
-from benchmarking.backends.base_backend import marginal_predict
-from benchmarking.backends.true_value.trees.shapiq_backend import _class_index
-from benchmarking.backends.true_value.trees.woodelf_backend import _woodelf_class_sign_is_flipped
+from backends.base_backend import marginal_predict
+from backends.true_value.trees.shapiq_backend import _class_index
+from backends.true_value.trees.woodelf_backend import _woodelf_class_sign_is_flipped
 
 
 @pytest.fixture(scope="module")
@@ -80,7 +80,7 @@ def test_path_dependent_rows_are_additive_against_own_base_value(binary_data, tm
     (backend.baseline_), not the shared background mean — otherwise every
     path-dependent and order-2 row carries a fake constant gap."""
     from benchmarking.runner import BenchmarkRunner
-    from benchmarking.backends import (
+    from backends import (
         ShapTrueValueBackend,
         ShapTreePathDependentBackend,
         ShapIQTreePathDependentBackend,

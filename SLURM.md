@@ -337,11 +337,13 @@ configs/
 ├── RQ4-tree/config-tree-fasttreeshap.yaml               ← fasttreeshap-only repair sweep (needs its own venv, step 4b)
 └── RQ5-gpu/config-tree-gpu.yaml                         ← woodelf CPU vs. GPU (cupy) backends
 
+backends/
+└── true_value/{tabular,trees}, approximators/{tabular,neural}  ← one class per (library, mode)
+
 benchmarking/
 ├── runner.py             ← BenchmarkRunner — oracle + approximators per cell
 ├── metrics.py             ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
 ├── config.py              ← load_config / load_dataset_config — expand a config.yaml into parameter lists
-├── backends/               ← true_value/{tabular,trees}, approximators/{tabular,neural} — one class per (library, mode)
 ├── results_<config_name>.csv  ← merged results per config (after step 5/7)
 └── slurm_results/
     └── <config_name>/          ← per-task CSVs, one dir per config (gitignored)

@@ -105,7 +105,7 @@ uv run python slurm/run_benchmark.py --task-id 0 --config configs/RQ4-tree/confi
 
 `fasttreeshap` requires `numpy<2`, incompatible with this project's main `numpy>=2` stack, so it runs out-of-process in a dedicated venv — provision it once with `bash scripts/setup_fasttreeshap_env.sh`. It also can't parse XGBoost 3.x's model format (an upstream limitation) and is skipped for XGBoost models specifically.
 
-`shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `benchmarking/backends/true_value/trees/shapiq_backend.py`).
+`shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `backends/true_value/trees/shapiq_backend.py`).
 
 GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/RQ5-gpu/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows.
 
@@ -140,20 +140,20 @@ uv run pytest tests/
 ## Project structure
 
 ```
-benchmarking/
+backends/                    # one BaseBackend subclass per (library, mode) — adapters over the XAI libraries
+  base_backend.py           # BaseBackend ABC; marginal_predict, nan_result, reduce_multiclass, ...
+  true_value/                # exact/reference backends (computation_type = "true_value")
+    tabular/                 # shap, shapiq, lightshap, dalex — model-agnostic oracles
+    trees/                   # shap, shapiq, woodelf, fasttreeshap — tree-specific oracles, own modes/order-2
+  approximators/             # approximate backends (computation_type = "approximation")
+    tabular/                 # shap, shapiq, lightshap, dalex — model-agnostic approximators
+    neural/                  # captum, shap_nn, shapiq_nn — gradient-based, PyTorch-only
+benchmarking/                # the harness that runs backends/ over models/ + datasets/ and scores the result
   runner.py                 # BenchmarkRunner — runs one oracle + backends/approximations per cell
   metrics.py                # mean_abs_diff, sign_agreement, mean_sample_rho, additivity gaps
   eval_counter.py           # CountingModel — counts real model evaluations per backend
   timeout.py                # per-backend wall-clock budget
   config.py                 # load_config / load_dataset_config — expand a config yaml into parameter lists
-  backends/
-    base_backend.py         # BaseBackend ABC; marginal_predict, nan_result, reduce_multiclass, ...
-    true_value/              # exact/reference backends (computation_type = "true_value")
-      tabular/               # shap, shapiq, lightshap, dalex — model-agnostic oracles
-      trees/                 # shap, shapiq, woodelf, fasttreeshap — tree-specific oracles, own modes/order-2
-    approximators/           # approximate backends (computation_type = "approximation")
-      tabular/               # shap, shapiq, lightshap, dalex — model-agnostic approximators
-      neural/                # captum, shap_nn, shapiq_nn — gradient-based, PyTorch-only
 models/
   model.py                  # Model enum, actual_max_depth()
   trainers.py                # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations

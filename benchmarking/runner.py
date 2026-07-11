@@ -6,7 +6,7 @@ from typing import Type
 import numpy as np
 import pandas as pd
 
-from .backends.base_backend import BaseBackend, marginal_predict, nan_result, nan_interaction_result
+from backends.base_backend import BaseBackend, marginal_predict, nan_result, nan_interaction_result
 from .eval_counter import CountingModel
 from .metrics import (
     mean_abs_diff,

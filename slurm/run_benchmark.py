@@ -14,7 +14,7 @@ import warnings
 
 # xgboost/lightgbm must be imported before shapiq anywhere in this process, or a
 # later xgboost/lightgbm .fit() segfaults — establishes safe load order before
-# `from benchmarking.backends import (...)` pulls in shapiq. Keep these imports
+# `from backends import (...)` pulls in shapiq. Keep these imports
 # at the very top; do not let an import sorter move them below the benchmarking
 # imports.
 import xgboost  # noqa: F401,E402  isort:skip
@@ -27,7 +27,7 @@ from benchmarking.config import load_config, load_dataset_config, as_list
 from datasets.load_datasets import Dataset
 from models.model import Model, actual_max_depth
 from benchmarking import BenchmarkRunner
-from benchmarking.backends import (
+from backends import (
     ShapTrueValueBackend,
     ShapApproxBackend,
     ShapIQTrueValueBackend,
@@ -58,7 +58,7 @@ warnings.filterwarnings(
     "ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
 
-# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in benchmarking.backends for
+# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in backends for
 # future use but aren't wired in here yet (XGBoost-only, unverified on real
 # GPU hardware) — only woodelf's GPU=True path is wired below.
 

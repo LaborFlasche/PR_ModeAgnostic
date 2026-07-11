@@ -28,7 +28,7 @@ from benchmarking.config import load_config, load_dataset_config, as_list
 from datasets.load_datasets import Dataset
 from models.model import Model
 from benchmarking import BenchmarkRunner
-from benchmarking.backends import (
+from backends import (
     ShapIQTrueValueBackend,
     ShapIQNNApproxBackend,
     CaptumApproxBackend,

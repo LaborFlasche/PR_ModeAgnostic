@@ -15,7 +15,7 @@ from sklearn.tree import (
 )
 # xgboost/lightgbm are imported lazily below (not at module level): importing
 # xgboost before shapiq segfaults shapiq's interventional TreeExplainer later —
-# see benchmarking/backends/true_value/trees/shapiq_backend.py.
+# see backends/true_value/trees/shapiq_backend.py.
 from datasets.load_datasets import Dataset
 
 from models.trainers import SklearnTrainer, PytorchTrainer
