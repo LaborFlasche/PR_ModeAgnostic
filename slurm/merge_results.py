@@ -29,11 +29,11 @@ def main():
 
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
 
-    # Identity = every column that is not a per-run output. Allowlisting
-    # hyperparam columns previously collapsed runs that differed in any other
+    # Identity = every column that isn't a per-run output. Allowlisting
+    # hyperparam columns previously collapsed runs differing in any other
     # swept param (min_samples_split, alpha, NN params, ...) and ignored
-    # `order`; deriving the key from the schema keeps every run_meta and sweep
-    # column in the identity automatically.
+    # `order`; deriving from the schema keeps every run_meta/sweep column in
+    # the identity automatically.
     identity_cols = [c for c in df.columns if c not in RUN_OUTPUT_COLUMNS]
     df = df.drop_duplicates(subset=identity_cols, keep="last")
 

@@ -116,8 +116,7 @@ class Model(Enum):
                 filtered = {k: v for k, v in params.items() if k in valid}
                 model = Ridge(**{**base, **filtered})
             else:
-                # C is used by LogisticRegression; alpha and other Ridge-only params are
-                # silently dropped by filtering against LogisticRegression's accepted parameter names.
+                # C is used by LogisticRegression; other Ridge-only params are dropped the same way.
                 valid = set(LogisticRegression().get_params())
                 filtered = {k: v for k, v in params.items() if k in valid}
                 # C=0.1 is the built-in "regularized" default (distinguishes this

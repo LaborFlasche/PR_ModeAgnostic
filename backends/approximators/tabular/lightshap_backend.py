@@ -11,14 +11,14 @@ class LightShapApproxBackend(BaseBackend):
     config:
         approximator: "kernel" or "permutation" (lightshap's ``method``)
         budget: maximum number of sampling iterations (lightshap's ``max_iter``).
-            One iteration is a forward+backward pass over a random permutation, so
-            this is not directly comparable to other libraries' budgets — rely on
-            the measured model-evaluation count for cross-library comparison.
+            One iteration is a forward+backward pass over a random permutation —
+            not comparable to other libraries' budgets; use the measured
+            model-evaluation count instead.
 
-    ``how="sampling"`` forces the iterative approximation path (lightshap would
-    otherwise compute exact values for small feature counts). lightshap's permutation
-    sampling requires at least 4 features, which the config's ``n_features`` floor
-    guarantees.
+    ``how="sampling"`` forces the iterative approximation path (lightshap
+    otherwise computes exact values at low feature counts). Permutation
+    sampling needs at least 4 features, guaranteed by the config's
+    ``n_features`` floor.
     """
 
     name = "lightshap_approx"

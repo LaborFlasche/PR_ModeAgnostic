@@ -72,11 +72,11 @@ def build_approx_specs(bench: dict) -> list[tuple]:
 def build_run_meta(*, dataset: str, dataset_params: dict, model: str,
                    n_background: int, device: str,
                    model_params: dict | None = None) -> dict:
-    """Identity metadata for every CSV row of one cell. Records the device —
-    cpu and cuda sweeps of the same config are otherwise indistinguishable in
-    merged results — and flattens dataset and model params in (parity with
-    run_benchmark.py's run_meta). Non-scalar model params (e.g. mlp's
-    hidden_sizes list) are JSON-encoded so the CSV cells stay hashable for
+    """Identity metadata for every CSV row of one cell. Records the device
+    (cpu/cuda sweeps of the same config are otherwise indistinguishable in
+    merged results) and flattens dataset/model params, matching
+    run_benchmark.py's run_meta. Non-scalar model params (e.g. mlp's
+    hidden_sizes list) are JSON-encoded so CSV cells stay hashable for
     merge_results.py's drop_duplicates."""
     mp_meta = {k: json.dumps(v) if isinstance(v, (list, dict)) else v
                for k, v in (model_params or {}).items()}

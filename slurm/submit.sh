@@ -1,10 +1,8 @@
 #!/bin/bash
-# Run this from the repo root:  bash slurm/submit.sh <config_path>
-# The config path is required, e.g. configs/RQ1-accuracy/config-accuracy.yaml.
-# Run it again with a different config (e.g. configs/RQ4-tree/config-tree.yaml)
-# for another sweep — each config gets its own output directory and merged CSV
-# so the runs don't collide and can be submitted in parallel.
-# It submits the array job and then a merge job that waits for it.
+# Run from the repo root: bash slurm/submit.sh <config_path>
+# e.g. configs/RQ1-accuracy/config-accuracy.yaml — each config gets its own
+# output directory and merged CSV, so multiple configs can run in parallel.
+# Submits one array job, then a merge job that waits for it.
 
 set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -34,9 +32,8 @@ echo "Submitting $N array tasks for config=$CONFIG (via $ARRAY_SCRIPT)..."
 
 mkdir -p slurm/logs "$OUTPUT_DIR"
 
-# Start each sweep from a clean per-task output dir. These files are transient — they
-# are merged into $MERGED_CSV at the end. Clearing them prevents stale files from a
-# previous sweep (possibly a different task count or column schema) leaking into the merge.
+# Clean per-task output dir: these files are transient (merged into
+# $MERGED_CSV below); clears stale files left by a previous sweep.
 rm -f "$OUTPUT_DIR"/results_*.csv
 
 ARRAY_JOB=$(sbatch \

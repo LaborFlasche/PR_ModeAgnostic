@@ -24,7 +24,7 @@ class ShapIQTrueValueBackend(BaseBackend):
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         columns = x.columns
-        # Because shapiq does not support DataFrames, we convert to numpy arrays and pass the column names separately.
+        # shapiq needs numpy arrays, not DataFrames.
         background_np = self.background.values.astype(float)
         x_np = x.values.astype(float)
         n_features = x_np.shape[1]
@@ -42,7 +42,7 @@ class ShapIQTrueValueBackend(BaseBackend):
 
         f = marginal_predict(self.model, columns)
 
-        # We explicity set the approximator to "auto" but due to the low number of features, shapiq will calculate exact values
+        # approximator="auto" resolves to exact computation at this few features.
         explainer = shapiq.TabularExplainer(
             model=f,
             data=background_np,

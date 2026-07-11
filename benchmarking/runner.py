@@ -32,13 +32,12 @@ RUN_OUTPUT_COLUMNS = {
 
 def spec_key(name: str, approximator=None, budget=None) -> str:
     """pairwise_metrics key for one run spec — single source of truth, shared
-    with scripts/recompute_pairwise_metrics.py so offline recomputes emit the
-    exact keys fresh runs do. True-value backends run once per class and keep
-    the bare backend name (merge_fasttreeshap_repair.py looks entries up by
-    name). Approximation specs can share a class (same library, different
-    approximator/budget), so the key must carry both or the specs would
-    overwrite each other's pairwise entries. Budgets are normalized through
-    int() because a CSV round-trip turns 256 into 256.0."""
+    with scripts/recompute_pairwise_metrics.py. True-value backends run once
+    per class and keep the bare name (merge_fasttreeshap_repair.py looks
+    entries up by name). Approximation specs can share a class (same library,
+    different approximator/budget), so the key must carry both, or specs
+    would overwrite each other's pairwise entries. Budget is normalized
+    through int() since a CSV round-trip turns 256 into 256.0."""
     if approximator is None or (isinstance(approximator, float) and np.isnan(approximator)):
         return name
     if isinstance(budget, float) and budget == int(budget):
@@ -94,7 +93,6 @@ class BenchmarkRunner:
 
         # Reference predictions/baseline for the additivity check, using mean
         # f(background) as the fallback base value for marginal-game backends.
-  
         f = marginal_predict(model, X.columns)
         eval_preds = np.asarray(f(X_eval), dtype=float)
         baseline = float(np.mean(np.asarray(f(background), dtype=float)))
@@ -171,7 +169,6 @@ class BenchmarkRunner:
     @staticmethod
     def _nan_contrib(cls: Type[BaseBackend], X_eval: pd.DataFrame) -> pd.DataFrame:
         return nan_result(X_eval) if cls.order == 1 else nan_interaction_result(X_eval)
-
 
     def _row(self, run_meta, candidate, all_results, eval_preds, baseline) -> dict:
         c_contrib = candidate["contrib"]

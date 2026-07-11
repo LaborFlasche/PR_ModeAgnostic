@@ -3,8 +3,7 @@ import numpy as np
 
 
 def as_list(value):
-    """Normalize a benchmark field that may be a scalar or a list into a list.
-    """
+    """Normalize a benchmark field that may be a scalar or a list into a list."""
     return list(value) if isinstance(value, list) else [value]
 
 

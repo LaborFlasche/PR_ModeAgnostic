@@ -1,15 +1,12 @@
-# fasttreeshap-only repair sweep for the cells that produced all-NaN rows in
-# results_config-tree.csv (BUGS_TO_FIX.md Bug 5: the dedicated numpy<2 venv was
-# missing on the cluster). Mirrors configs/RQ4-tree/config-tree.yaml, trimmed to what
-# fasttreeshap can actually run:
+# fasttreeshap-only repair sweep, for cells that produced all-NaN rows in
+# results_config-tree.csv because the dedicated numpy<2 venv was missing on
+# the cluster. Mirrors config-tree.yaml, trimmed to what fasttreeshap can run:
 #   - xgboost removed: fasttreeshap 0.1.6 cannot parse XGBoost 3.x models
 #     (skipped by design, see fasttreeshap_backend.py).
 #   - only the fasttreeshap backends are swept; ShapTrueValueBackend (order 1)
-#     and ShapInteractionBackend (order 2) still run implicitly as oracles, so
-#     every row carries pairwise metrics vs the exact reference.
-# Results land in benchmarking/results_config-tree-fasttreeshap.csv — evaluate
-# fasttreeshap from its own rows there; the main tree CSV stays untouched.
-# Prerequisite on the cluster: bash scripts/setup_fasttreeshap_env.sh
+#     and ShapInteractionBackend (order 2) still run implicitly as oracles.
+# Results land in results_config-tree-fasttreeshap.csv — the main tree CSV
+# stays untouched. Prerequisite: bash scripts/setup_fasttreeshap_env.sh
 benchmark:
   seed: [0,1,2,3,4,5,6,7,8,9]
   imputer: marginal
@@ -36,7 +33,6 @@ models:
     n_estimators: [100]
     max_depth: [4, 8, 12, 15, 20, 50, 80]
 
-# Same dataset grid as configs/config.yaml.
 datasets:
   gisette:
     n_features: [1000]

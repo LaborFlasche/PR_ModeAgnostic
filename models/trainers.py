@@ -9,23 +9,17 @@ from torch.utils.data import DataLoader, TensorDataset
 class TorchPredictor(nn.Module):
     """Wraps a raw ``nn.Module`` with a unified scalar output for Shapley explanation.
 
-    All methods (gradient-based and model-agnostic) explain the same scalar function:
+    Regression returns the raw output (squeezed, de-standardized to original
+    units). Classification returns ``P(class=target_class)`` via softmax
+    (target_class=1 binary, 0 multiclass), matching ``marginal_predict``/
+    ``ShapIQTrueValueBackend``. This makes gradient-based attributions
+    (GradientShap) and model-agnostic ones (KernelShap, ShapIQ) directly
+    comparable, without a captum ``target`` argument.
 
-    * Regression       → raw output (squeezed to 1-D), de-standardized to
-                         original target units when the trainer standardized y.
-    * Classification   → ``P(class=target_class)`` via softmax.
-                         Binary: target_class=1, multiclass: target_class=0.
-                         Matches ``marginal_predict`` and ``ShapIQTrueValueBackend``.
-
-    This makes gradient-based attributions (GradientShap) and model-agnostic
-    attributions (KernelShap, ShapIQ) directly comparable without needing a
-    ``target`` neuron argument in captum.
-
-    Feature/target standardization lives *inside* ``forward`` (not in the
-    trainer's data pipeline alone) so that every explanation path — gradient
-    backends backpropagating through ``forward`` and model-agnostic backends
-    calling ``predict`` — sees the model in the original feature and output
-    space. The scaling is simply part of the explained function ``f``.
+    Feature/target standardization lives *inside* ``forward`` (not just the
+    trainer's data pipeline) so every explanation path — gradient backends
+    backpropagating through ``forward``, model-agnostic backends calling
+    ``predict`` — sees the model in the original feature/output space.
 
     Parameters
     ----------
@@ -226,11 +220,10 @@ class PytorchTrainer(ModelTrainer):
         in_features = X_np.shape[1]
         X_t = torch.tensor(X_np, dtype=torch.float32)
 
-        # Standardize features for training: raw magnitudes up to ~1e5
-        # (adult capital-gain, ames areas) overflow the transformer's
-        # attention to NaN on the cluster. Constant features keep std=1 so
-        # they pass through unchanged. The stats go into TorchPredictor so
-        # explainers keep operating in the original feature space.
+        # Standardize features for training: raw magnitudes up to ~1e5 (adult
+        # capital-gain, ames areas) overflow the transformer's attention to
+        # NaN. Constant features keep std=1 (pass through unchanged); the
+        # stats go into TorchPredictor so explainers see the original space.
         x_mean = X_t.mean(dim=0)
         x_std = X_t.std(dim=0)
         x_std = torch.where(x_std > 0, x_std, torch.ones_like(x_std))

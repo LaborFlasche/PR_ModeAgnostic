@@ -50,10 +50,9 @@ def main():
         model = pickle.load(f)
     x = pd.read_csv(args.x, index_col=0)
 
-    # algorithm="v2" (the default, for speed) doesn't support interactions —
-    # fasttreeshap itself falls back to v1 with a printed warning if asked, so fall
-    # back explicitly instead to keep the choice visible and avoid the extra internal
-    # v2-then-v1 detection round trip.
+    # algorithm="v2" (default) doesn't support interactions; fasttreeshap would
+    # fall back to v1 itself with a printed warning, but fall back explicitly
+    # here to keep the choice visible.
     algorithm = "v1" if (args.interactions and args.algorithm == "v2") else args.algorithm
     explainer = fasttreeshap.TreeExplainer(model, algorithm=algorithm, n_jobs=-1, shortcut=False)
 
@@ -66,10 +65,9 @@ def main():
 
     result.to_csv(args.output)
 
-    # Base value of the path-dependent game, class-selected like the values above
-    # (binary -> class 1, multiclass -> class 0). Written to a sidecar the parent
-    # backend reads back so the runner can check additivity against the game
-    # fasttreeshap actually explains, not the marginal background baseline.
+    # Base value of the path-dependent game (same class convention as above),
+    # written to a sidecar the parent backend reads to check additivity
+    # against the game fasttreeshap explains, not the marginal baseline.
     ev = np.ravel(np.asarray(explainer.expected_value, dtype=float))
     base = float(ev[1] if ev.size == 2 else ev[0])
     with open(args.output + ".baseline", "w") as f:

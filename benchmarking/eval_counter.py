@@ -1,11 +1,10 @@
 """Model wrapper that counts how many rows are scored.
 
-The number of model evaluations (forward passes) is the fair, library-agnostic
-x-axis for comparing approximators: each library exposes its budget in different
-units (shapiq ``budget``, shap ``nsamples``/``max_evals``, lightshap ``max_iter``,
-dalex ``B``), but they all ultimately call the model on masked coalitions. Wrap
-the model in ``CountingModel`` before handing it to a backend and read
-``.n_rows`` afterwards to get the real evaluation count.
+Model evaluations (forward passes) are the fair, library-agnostic x-axis for
+comparing approximators: each library exposes budget differently (shapiq
+``budget``, shap ``nsamples``/``max_evals``, lightshap ``max_iter``, dalex
+``B``), but all ultimately call the model on masked coalitions. Wrap the
+model in ``CountingModel`` and read ``.n_rows`` afterwards for the real count.
 """
 
 from __future__ import annotations

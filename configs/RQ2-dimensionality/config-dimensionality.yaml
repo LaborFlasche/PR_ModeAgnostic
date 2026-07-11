@@ -1,22 +1,18 @@
 benchmark:
-  # Single source of truth for all randomness in the benchmark. The same seed is
-  # threaded into data subsampling, model training (every estimator's random_state),
-  # and every stochastic approximator (shap, shapiq, lightshap, dalex), so changing
-  # this one value reseeds the whole experiment reproducibly. Recorded per row in the
-  # results CSV. There are no hardcoded fallback seeds anywhere downstream.
+  # Single source of truth for all randomness (data subsampling, model
+  # training, every stochastic approximator). Recorded per row in the results
+  # CSV; no hardcoded fallback seeds exist downstream.
   seed: [0,1,2,3,4,5,6,7,8,9]
-  # Number of rows used as the imputer background / reference set (defines the
-  # marginal value function). Cost per explanation scales with this;
+  # Number of rows used as the imputer background/reference set (defines the
+  # marginal value function). Cost per explanation scales with this.
   n_background: 100
-  # Number of instances actually explained and averaged per (model, dataset) cell.
-  # The main runtime lever. The averaged accuracy metrics stabilise after a few
-  # hundred points, so a small value keeps representativeness while cutting runtime
-  # drastically. Use null to explain every remaining row.
+  # Number of instances explained and averaged per (model, dataset) cell — the
+  # main runtime lever. Metrics stabilize after a few hundred points, so a
+  # small value cuts runtime while staying representative. null = every row.
   n_eval: 10
-  # Wall-clock budget per backend run (true-value AND each approximation spec);
-  # a backend exceeding this logs a [SKIP] and gets an all-NaN row instead of
-  # stalling the whole cell. The main risk here is KernelSHAP/permutation on the
-  # 256-feature gisette cells. null = no timeout.
+  # Wall-clock budget per backend run; exceeding it logs a [SKIP] and yields
+  # an all-NaN row instead of stalling the cell. Main risk: KernelSHAP/
+  # permutation on the 256-feature gisette cells. null = no timeout.
   backend_timeout_s: 600
   # Approximation sweep: only the selected (library × approximator × budget)
   # combinations are run. Budget units differ across libraries — the recorded
@@ -24,13 +20,11 @@ benchmark:
   approx_backends: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
   budgets: [512, 1024]
-  # Imputation scheme = the value function every library explains. "marginal" imputes
-  # masked features from the background distribution independently of the present ones.
-  # Threaded into every backend (shapiq imputer="marginal", shap Independent masker /
-  # KernelExplainer background, lightshap bg_X, dalex background sampling, shapr
-  # approach="independence"), so all libraries are compared on the *same* value function
-  # and it is controlled from this one field. "marginal" is currently the only supported
-  # value; a backend raises if asked for anything it cannot honor.
+  # Value function every library explains. "marginal" imputes masked features
+  # from the background distribution independently. Threaded into every
+  # backend (shapiq imputer=, shap masker, lightshap bg_X, dalex background
+  # sampling) so all libraries compare on the *same* function. Only "marginal"
+  # is supported; a backend raises if asked for anything else.
   imputer: marginal
   # Tree-specific backends and models live in configs/RQ4-tree/config-tree.yaml instead.
 
@@ -61,16 +55,13 @@ models:
     max_iter: [100]
     # max_iter: [100, 200]
 
-# Feature counts are log-spaced, not linear: approximation quality and cost bend
-# hardest in the low range (4 -> ~128) and flatten after, so dense low / sparse high
-# samples the informative part. Counts are realized as the top-N highest-variance
-# columns of each dataset (see datasets/load_datasets.py). gisette is capped at 256:
-# with a fixed budget of 64, KernelSHAP becomes pure noise far beyond that (you cannot
-# estimate hundreds of Shapley values from 64 coalition samples), so wider cells would
-# cost most of the runtime while producing uncomparable results. Three datasets cover
-# the axes that matter — regression (ames), mixed-type classification (adult), and a
-# high-dimensional stress test (gisette) — without the redundant overlapping sweeps
-# that california (subset of ames) and covertype (overlaps adult) added.
+# Feature counts are log-spaced, not linear: approximation quality and cost
+# bend hardest in the low range and flatten after, so dense-low/sparse-high
+# sampling covers the informative part. Realized as the top-N highest-variance
+# columns per dataset (see datasets/load_datasets.py). gisette is capped at
+# 256: at budget 64, KernelSHAP is pure noise beyond that (can't estimate
+# hundreds of Shapley values from 64 coalition samples), so wider cells would
+# cost runtime for incomparable results.
 datasets:
   ames_housing:        # regression, real-world features, up to 79 native
     n_features: [14,32,79]

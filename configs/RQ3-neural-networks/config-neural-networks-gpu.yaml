@@ -3,12 +3,11 @@ benchmark:
   imputer: marginal
   n_background: 100
   n_eval: 10
-  # Wall-clock budget per backend run (the shapiq reference AND each
-  # approximation spec); exceeding it logs a [SKIP] and yields an all-NaN row
-  # instead of stalling the cell. Higher than the tree configs' 600s because
-  # the budget-capped shapiq reference (2^14 coalitions x n_background imputed
-  # rows) is legitimately slow on the wide cells (ames 79 / gisette 256,
-  # transformer). null = no timeout.
+  # Wall-clock budget per backend run (shapiq reference + each approximation
+  # spec); exceeding it logs [SKIP] and yields an all-NaN row. Higher than the
+  # tree configs' 600s since the shapiq reference (2^14 coalitions ×
+  # n_background rows) is legitimately slow on wide cells (ames 79, gisette
+  # 100, transformer). null = no timeout.
   backend_timeout_s: 1800
   # Approximation sweep (library × approximator × budget), filtered by
   # each backend's SUPPORTED_APPROXIMATORS:

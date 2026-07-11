@@ -6,9 +6,7 @@ from ...base_backend import BaseBackend, marginal_predict
 
 
 class LightShapExactBackend(BaseBackend):
-    """
-    LightShap's exact SHAP on the marginal value function.
-    """
+    """LightShap's exact SHAP on the marginal value function."""
 
     name = "lightshap_exact"
     library = "lightshap"

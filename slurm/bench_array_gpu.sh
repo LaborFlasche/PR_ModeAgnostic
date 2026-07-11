@@ -5,11 +5,10 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm/logs/bench_%A_%a.out
 #SBATCH --error=slurm/logs/bench_%A_%a.err
-# GPU counterpart of bench_array.sh — used for configs/RQ5-gpu/config-tree-gpu.yaml
-# (and any other config whose name contains "gpu", see submit.sh). The CIP
-# cluster defines no GPU GRES (sinfo: GRES=(null) everywhere), so --gres/--gpus
-# are rejected — the NvidiaAll partition alone provides the node's GPU.
-# Everything else mirrors bench_array.sh.
+# GPU counterpart of bench_array.sh, for configs/RQ5-gpu/config-tree-gpu.yaml
+# (or any config whose name contains "gpu" — see select_array_script.sh). The
+# CIP cluster defines no GPU GRES (sinfo: GRES=(null) everywhere), so
+# --gres/--gpus are rejected — the NvidiaAll partition alone provides the GPU.
 # --array is set dynamically by submit.sh — do not set it here
 # $1 = config path, $2 = output dir — both passed through by submit.sh.
 

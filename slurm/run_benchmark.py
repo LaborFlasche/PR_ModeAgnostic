@@ -12,11 +12,9 @@ import os
 import sys
 import warnings
 
-# xgboost/lightgbm must be imported before shapiq anywhere in this process, or a
-# later xgboost/lightgbm .fit() segfaults — establishes safe load order before
-# `from backends import (...)` pulls in shapiq. Keep these imports
-# at the very top; do not let an import sorter move them below the benchmarking
-# imports.
+# xgboost/lightgbm must be imported before shapiq anywhere in this process, or
+# a later .fit() call segfaults. Keep these at the very top — don't let an
+# import sorter move them below `from backends import (...)`.
 import xgboost  # noqa: F401,E402  isort:skip
 import lightgbm  # noqa: F401,E402  isort:skip
 
@@ -55,10 +53,6 @@ warnings.filterwarnings(
     "ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
 
-# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in backends for
-# future use but aren't wired in here yet (XGBoost-only, unverified on real
-# GPU hardware) — only woodelf's GPU=True path is wired below.
-
 # Approximator backends, selectable via the config's `approx_backends` list and
 # run once per (approx_backend × approximator × budget) combination.
 APPROX_MAP = {
@@ -78,14 +72,11 @@ TRUE_VALUE_BACKEND_MAP = {
     "dalex_true_value": DalexTrueBackend,
 }
 
-# Tree-specific true-value backends, only applied to tree models (Model.is_tree).
-# Keyed by (library, mode). shapiq_tree interventional was previously excluded
-# (reported hangs/segfaults against shapiq 1.5.0) but re-verified clean against
-# shapiq 1.5.2 across the full config-tree.yaml depth/feature-count grid — see
-# ShapIQTreeInterventionalBackend's docstring. backend_timeout_s (BenchmarkRunner)
-# is the safety net if it still misbehaves on an untested topology.
-# "gpu_path_dependent"/"gpu_interventional" run woodelf's GPU=True (cupy-backed)
-# path — unverified on real GPU hardware, skips to all-NaN without a CUDA device.
+# Tree-specific true-value backends (Model.is_tree only), keyed by (library,
+# mode). shapiq_tree interventional's exclusion history is in
+# ShapIQTreeInterventionalBackend's docstring. "gpu_path_dependent"/
+# "gpu_interventional" run woodelf's GPU=True (cupy) path — unverified on
+# real GPU hardware, skips to all-NaN without a CUDA device.
 TREE_TRUE_VALUE_MAP = {
     ("shap_tree", "path_dependent"): ShapTreePathDependentBackend,
     ("shapiq_tree", "path_dependent"): ShapIQTreePathDependentBackend,
@@ -156,12 +147,9 @@ def main():
 
     model_enum = Model[mk.upper()]
 
-    # `true_backends` selects model-agnostic true-value backends directly — only
-    # config-accuracy.yaml sets this, to pit true-value backends against each
-    # other. Every other config omits it, so no model-agnostic true-value
-    # backend runs there; those configs rely solely on their approximation
-    # sweep (approx_specs above) and/or the tree-specific true-value backends
-    # appended below.
+    # `true_backends` pits model-agnostic true-value backends against each
+    # other — only config-accuracy.yaml sets this. Other configs rely solely
+    # on approx_specs above and/or the tree-specific backends appended below.
     backend_names = bench.get("true_backends", [])
     unknown = [name for name in backend_names if name not in TRUE_VALUE_BACKEND_MAP]
     if unknown:

@@ -12,7 +12,7 @@ Usage (run from repo root, in a persistent session such as tmux/screen):
     python slurm/submit_all.py --configs accuracy dimensionality
     python slurm/submit_all.py --configs tree nn
 
-Available config keys: accuracy, dimensionality, tree, nn, tree-gpu
+Run with --help for the full list of config keys (CONFIG_REGISTRY below).
 """
 import argparse
 import glob
@@ -29,13 +29,12 @@ from slurm.task_grid import build_all_runs
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls
 
-# "sbatch_args" override slurm/single_task.sh's #SBATCH directives (CLI options
-# take precedence): the nn config runs with device=cuda and the tree-gpu config
-# exercises woodelf's cupy path, so both need a GPU node instead of Krater.
-# The CIP cluster defines no GPU GRES (sinfo shows GRES=(null) on every
-# partition), so --gres/--gpus flags are rejected with "Invalid generic
-# resource specification" — requesting the NvidiaAll partition alone is both
-# necessary and sufficient; the node's GPU is directly visible to the job.
+# "sbatch_args" override single_task.sh's #SBATCH directives (CLI options take
+# precedence): nn (device=cuda) and tree-gpu (woodelf's cupy path) need a GPU
+# node instead of Krater. The CIP cluster defines no GPU GRES (sinfo shows
+# GRES=(null) everywhere), so --gres/--gpus are rejected — the NvidiaAll
+# partition alone is necessary and sufficient; the node's GPU is directly
+# visible to the job.
 CONFIG_REGISTRY = {
     "accuracy": {
         "config": "configs/RQ1-accuracy/config-accuracy.yaml",
@@ -53,8 +52,8 @@ CONFIG_REGISTRY = {
         "config": "configs/RQ4-tree/config-tree.yaml",
         "worker": "slurm/run_benchmark.py",
     },
-    # fasttreeshap-only repair sweep (see BUGS_TO_FIX.md Bug 5); requires
-    # scripts/setup_fasttreeshap_env.sh to have been run on the cluster first.
+    # fasttreeshap-only repair sweep (see config-tree-fasttreeshap.yaml);
+    # requires scripts/setup_fasttreeshap_env.sh to have been run on the cluster first.
     "tree-fasttreeshap": {
         "config": "configs/RQ4-tree/config-tree-fasttreeshap.yaml",
         "worker": "slurm/run_benchmark.py",
@@ -192,10 +191,9 @@ def run(selected: list[str]) -> None:
         cfg = CONFIG_REGISTRY[key]["config"]
         n = count_tasks(cfg)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
-        # Start from a clean per-task output dir (same as submit.sh): workers only
-        # overwrite their own results_<task_id>.csv, so a previous sweep with a
-        # larger grid would leave higher-numbered files behind and leak stale
-        # rows into the merged CSV.
+        # Clean per-task output dir (same as submit.sh): a previous sweep with
+        # a larger grid would leave stale results_<task_id>.csv files behind,
+        # leaking old rows into the merged CSV.
         config_name = os.path.basename(cfg).replace(".yaml", "")
         output_dir = os.path.join(REPO_ROOT, "benchmarking", "slurm_results", config_name)
         os.makedirs(output_dir, exist_ok=True)
@@ -277,7 +275,7 @@ def main() -> None:
         nargs="+",
         default=["all"],
         metavar="KEY",
-        help='Config key(s) to run, or "all" for all five. Default: all',
+        help='Config key(s) to run, or "all" for every registered config. Default: all',
     )
     args = parser.parse_args()
 

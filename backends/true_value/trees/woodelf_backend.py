@@ -15,11 +15,10 @@ from ...base_backend import (
 
 def _path_dependent_base_value(model) -> float:
     """Base value of the path-dependent game woodelf explains. woodelf never
-    reports one, but the game is fully determined by the model (cover-weighted
-    leaf expectation) and is identical to shap's path-dependent TreeExplainer
-    game (their values agree to ~1e-8), so shap's expected_value is exact.
-    select_base_value's binary -> class 1 pick also matches the sign-flip
-    correction applied to sklearn binary classifiers below."""
+    reports one, but the game is identical to shap's path-dependent
+    TreeExplainer (values agree to ~1e-8), so shap's expected_value is exact.
+    select_base_value's binary -> class 1 pick matches the sign-flip
+    correction below."""
     return select_base_value(shap.TreeExplainer(model).expected_value)
 
 
@@ -38,22 +37,15 @@ def _woodelf_multiclass_unsupported(model) -> bool:
     """True when woodelf's multiclass output is confirmed wrong for this model.
 
     woodelf never raises for a >2-class model — it silently always explains
-    "class 0" (no error, no class-selection option), so this can't be caught by
-    a try/except; it has to be predicted upfront. Empirically checked on toy
-    3-class xgboost/lightgbm/sklearn models against every class of the shap
-    oracle, both signs:
-      - sklearn-native classifiers: EXACT match (mean_abs_diff 0.0) — woodelf's
-        class-0 pick happens to equal ``reduce_multiclass``'s own "multiclass ->
-        class 0" convention (the same one every other backend uses). Safe to run.
-      - xgboost and lightgbm: best case (any class, either sign) is still
-        >100% relative error vs. the oracle's own scale — a genuine upstream
-        computation bug for boosting models specifically, not a fixable
-        index/sign mismatch like ``_woodelf_class_sign_is_flipped`` below. Must
-        skip both (not just xgboost — lightgbm is equally broken, despite the
-        old ``.objective`` string check only ever having caught xgboost).
+    "class 0", so this must be predicted upfront, not caught via try/except.
+    Empirically verified on toy 3-class models against every class of the shap
+    oracle, both signs: sklearn-native classifiers match exactly (woodelf's
+    class-0 pick equals ``reduce_multiclass``'s own convention, safe to run);
+    xgboost and lightgbm are both a genuine upstream computation bug (>100%
+    relative error vs. any class/sign) and must be skipped — not a fixable
+    index/sign issue like ``_woodelf_class_sign_is_flipped`` below.
 
-    Binary classifiers (<=2 classes) are unaffected by this function either way
-    — see ``_woodelf_class_sign_is_flipped`` for their separate, fixable issue.
+    Binary classifiers (<=2 classes) are unaffected either way.
     """
     classes = getattr(model, "classes_", None)
     if classes is None or len(classes) <= 2:
@@ -66,27 +58,20 @@ def _woodelf_class_sign_is_flipped(model) -> bool:
     woodelf's values come out sign-flipped relative to every other backend's
     class-1 convention.
 
-    Root cause (upstream, in the installed woodelf package, not this repo): woodelf
-    parses trees by reusing shap's own loader (parse_models.py: "Use the shap
-    package's Decision Tree loading. this is cheating, I know...") and then takes
-    ``tree.values[index][0]`` as the leaf value (parse_models.py's
-    ``load_decision_tree``). For sklearn CART classifiers, shap's ``SingleTree``
-    reshapes sklearn's per-node ``(1, n_classes)`` value array into ``n_classes``
-    columns (shap/explainers/_tree.py's ``SingleTree.__init__``), so for binary
-    classification index 0 is class 0's probability — not class 1, the convention
-    used everywhere else here (``ShapTrueValueBackend``, ``marginal_predict``,
-    ``reduce_multiclass``). Since prob(class 0) = 1 - prob(class 1) and Shapley
-    values are linear in the value function, this is an exact sign flip.
+    Root cause (upstream, in woodelf): it parses trees via shap's own loader
+    (parse_models.py: "Use the shap package's Decision Tree loading. this is
+    cheating, I know...") and takes ``tree.values[index][0]`` as the leaf
+    value. For sklearn CART classifiers, shap's ``SingleTree`` reshapes the
+    per-node value array into one column per class, so index 0 is class 0's
+    probability — not class 1, the convention used everywhere else in this
+    repo. Since prob(class 0) = 1 - prob(class 1), this is an exact sign flip.
 
-    Only fires for models whose leaves actually store per-class columns —
-    DecisionTreeClassifier (``tree_``) and forest classifiers (a list of such
-    trees in ``estimators_``). A plain "module starts with sklearn" test is
-    wrong: HistGradientBoostingClassifier is sklearn too, but its leaves hold a
-    single log-odds margin column whose index 0 is already the class-1
-    direction — flipping it would corrupt correct values (verified: woodelf's
-    raw HistGBC output matches shap to ~1e-7). Regressors are unaffected
-    (single output column); xgboost/lightgbm are unaffected (native leaf
-    values, not sklearn's ``tree.value``, so the reshape never applies).
+    Only fires for models whose leaves store per-class columns: DecisionTree-
+    Classifier and forest classifiers. HistGradientBoostingClassifier is
+    sklearn too, but its leaves hold a single log-odds margin already in the
+    class-1 direction — flipping it would corrupt correct values (verified:
+    matches shap to ~1e-7 unflipped). Regressors and xgboost/lightgbm are
+    unaffected (no such reshape).
     """
     if not (hasattr(model, "classes_") and len(model.classes_) == 2):
         return False

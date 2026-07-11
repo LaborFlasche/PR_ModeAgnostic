@@ -22,7 +22,6 @@ class ShapTrueValueBackend(BaseBackend):
             "n_background": self.config.get("n_background", 100),
         }
 
-
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         config = self.load_config()
         n_features = x.shape[1]
@@ -34,7 +33,7 @@ class ShapTrueValueBackend(BaseBackend):
                 "extremely slow or infeasible."
             )
 
-        # Because shap.Exact does not take a seed argument, we seed the global RNG for reproducibility.
+        # shap.Exact has no seed argument, so seed the global RNG instead.
         np.random.seed(config["random_state"])
         f = marginal_predict(self.model, x.columns)
         # shap.Exact needs a masker, but it's never actually invoked here because

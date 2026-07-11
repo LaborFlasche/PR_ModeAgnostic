@@ -15,14 +15,12 @@ class BaseBackend(ABC):
         self.model = model
         self.background = background
         self.config = config or {}
-        # Base value (empty-coalition value) of the game THIS backend explains,
-        # set by run_explainer when the library reports one. Path-dependent
-        # tree backends explain a different game than the marginal one (their
-        # base value is the cover-weighted training expectation, not the mean
-        # prediction over the background), so the runner must check additivity
-        # against this, not the shared background baseline. None = the backend
-        # explains the marginal game over the runner's background; the runner
-        # falls back to mean f(background), which is that game's base value.
+        # Base value of the game this backend explains, set by run_explainer
+        # if the library reports one. Path-dependent tree backends use a
+        # different base value (cover-weighted training expectation) than the
+        # marginal game, so the runner checks additivity against this, not the
+        # shared baseline. None = marginal game (runner falls back to mean
+        # f(background)).
         self.baseline_: float | None = None
 
     @abstractmethod
@@ -39,23 +37,16 @@ class BaseBackend(ABC):
 def marginal_predict(model, columns):
     """Build the scalar value function every backend explains the same game on.
 
-    @model: fitted model to wrap.
-    @columns: feature column names, used to rebuild a DataFrame from raw arrays.
+    xgboost/lightgbm are detected by module name, not isinstance, to avoid
+    importing them here (importing xgboost before shapiq segfaults shapiq's
+    interventional TreeExplainer — see trees/shapiq_backend.py). LGBMClassifier
+    needs the margin branch too: its leaves store log-odds and it has no
+    decision_function, so without raw_score=True it would fall through to
+    predict_proba and mismatch the shap oracle's margin-space additivity check.
 
-    XGBoost/LightGBM are detected via module name, not isinstance, to avoid
-    importing them here — importing xgboost before shapiq segfaults shapiq's
-    interventional TreeExplainer later in the process (see trees/shapiq_backend.py).
-    LGBMClassifier needs the margin branch just like XGBClassifier: its leaves
-    store log-odds, so the shap oracle (and every tree backend) explains the
-    margin — but it has no decision_function, so without raw_score=True it would
-    fall through to predict_proba and the additivity metrics would compare
-    margin-space Shapley sums against probability-space predictions.
-
-    The module-name check is done on ``model._model`` when present (e.g.
-    ``CountingModel``, whose whole point is to proxy calls through so they get
-    counted) because ``type(proxy).__module__`` reflects the proxy's own class,
-    not the wrapped model's — checking the proxy directly would always miss the
-    xgboost/lightgbm branches and silently fall through to predict_proba.
+    The module check reads ``model._model`` when present (CountingModel's
+    wrapped model), since checking the proxy's own class would always miss
+    the xgboost/lightgbm branches.
     """
 
     def f(X) -> np.ndarray:
@@ -108,13 +99,11 @@ def nan_result(x: pd.DataFrame) -> pd.DataFrame:
 
 
 def reduce_multiclass(values: np.ndarray | list, order: int = 1) -> np.ndarray:
-    """Normalize a tree-explainer's raw output to a single (n_samples, ...) array:
-    some libraries return a list of per-class arrays, others a trailing class
-    axis. Binary -> class 1, multiclass -> class 0, matching ShapTrueValueBackend.
-
-    ``order`` disambiguates a trailing class axis from a same-sized feature axis
-    (a regression interaction array is already (n, d, d), same ndim as a
-    multiclass first-order array) — only "ndim beyond order+1" means a class axis.
+    """Normalize a tree-explainer's raw output (list of per-class arrays, or a
+    trailing class axis) to one (n_samples, ...) array. Binary -> class 1,
+    multiclass -> class 0, matching ShapTrueValueBackend. ``order`` disambiguates
+    a trailing class axis from a same-sized feature axis (e.g. a (n,d,d)
+    interaction array has the same ndim without being multiclass).
     """
     if isinstance(values, list):
         idx = 1 if len(values) == 2 else 0

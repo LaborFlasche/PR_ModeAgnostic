@@ -7,14 +7,13 @@ from ...base_backend import BaseBackend, marginal_predict
 class DalexApproxBackend(BaseBackend):
     """dalex's SHAP (Štrumbelj–Kononenko marginal sampling) on the shared value function.
 
-    ``predict_parts(type="shap")`` averages a feature's contribution over ``B`` random
-    feature orderings, imputing "removed" features from the background ``data`` — the
-    same marginal/interventional value function as the other backends. dalex has no
-    kernel-weighting analogue, so it only supports the **permutation** approximator slot
-    (see ``SUPPORTED_APPROXIMATORS``).
+    ``predict_parts(type="shap")`` averages a feature's contribution over ``B``
+    random orderings, imputing removed features from the background — the same
+    value function as the other backends. dalex has no kernel-weighting
+    analogue, so only the **permutation** approximator slot is supported.
 
-    dalex returns variables ordered by ``|contribution|``, with the averaged values at
-    ``B == 0``; both are undone here (filter ``B == 0``, reindex by ``variable_name``).
+    dalex returns variables sorted by ``|contribution|`` with the averaged
+    values at ``B == 0``; both are undone here (filter, reindex).
 
     config:
         approximator: must be ``"permutation"`` (the only method dalex provides).

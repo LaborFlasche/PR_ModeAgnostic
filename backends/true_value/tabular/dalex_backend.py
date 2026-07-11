@@ -7,10 +7,10 @@ from ...base_backend import BaseBackend, marginal_predict
 class DalexTrueBackend(BaseBackend):
     """dalex's permutation-sampling SHAP (``predict_parts(type="shap")``), run as a true-value backend.
 
-    dalex has no exact/deterministic Shapley computation, so this is an approximation
-    that gets as close as possible to the true value by spending a total predict_parts
-    budget of 2^n_features model evaluations (B = 2^n_features / (n_features+1)
-    orderings). Infeasible for n_features > 14 — a warning is raised in that case.
+    dalex has no exact/deterministic Shapley method — this gets as close as
+    possible by spending a full 2^n_features model-eval budget
+    (B = 2^n_features/(n_features+1) orderings). Infeasible for n_features > 14
+    (warns in that case).
 
     config:
         seed: random_state for dalex.

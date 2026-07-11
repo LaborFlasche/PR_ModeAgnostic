@@ -7,10 +7,9 @@ from ...base_backend import BaseBackend, flatten_interactions
 
 def _class_index(model) -> int:
     """Class whose output shapiq explains: 1 for binary, 0 for multiclass,
-    matching ShapTrueValueBackend/reduce_multiclass. Counts ``classes_`` rather
-    than reading ``n_classes_``: HistGradientBoosting exposes only the former,
-    and a missing-attribute default of 2 would silently send a multiclass model
-    down the binary (class_index=1) path. Regressors (no ``classes_``) get 1,
+    matching ShapTrueValueBackend/reduce_multiclass. Uses ``classes_`` (not
+    ``n_classes_``, which HistGradientBoosting lacks) so a missing attribute
+    can't silently default to binary. Regressors (no ``classes_``) get 1,
     which shapiq ignores for single-output models."""
     n_classes = len(getattr(model, "classes_", ()))
     return 1 if n_classes in (0, 2) else 0
@@ -48,16 +47,11 @@ class ShapIQTreePathDependentBackend(_ShapIQTreeBackend):
 
 
 class ShapIQTreeInterventionalBackend(_ShapIQTreeBackend):
-    """shapiq's interventional TreeExplainer. Previously excluded from
-    TREE_TRUE_VALUE_MAP: reported to hang on real XGBoost/LightGBM and segfault
-    on plain sklearn models (non-deterministically, depending on tree topology)
-    against shapiq 1.5.0 + numba 0.65.1 + llvmlite 0.47.0 (macOS arm64) — not an
-    import-order issue. Re-verified against shapiq 1.5.2 (same numba/llvmlite,
-    same machine) across configs/RQ4-tree/config-tree.yaml's full grid — both models,
-    every max_depth (4-50), every n_features (4-256) — with no hangs or
-    crashes, so it's wired back in. Since the original report was
-    topology-dependent, BenchmarkRunner's backend_timeout_s is the safety net
-    if an untested topology still trips it."""
+    """shapiq's interventional TreeExplainer. Previously excluded (reported
+    topology-dependent hangs/segfaults on shapiq 1.5.0); re-verified clean on
+    1.5.2 across config-tree.yaml's full grid (both models, every depth/feature
+    count), so it's wired back in. backend_timeout_s remains the safety net if
+    an untested topology still trips it."""
 
     name = "shapiq_tree_interventional"
     mode = "interventional"
@@ -67,30 +61,19 @@ class ShapIQInteractionBackend(BaseBackend):
     """Pairwise (order-2, SII) shapiq interactions, path-dependent only
     (interventional order-1 already crashes unreliably; assume order-2 does too).
 
-    Uses index="SII" (not shapiq's own default of "k-SII"): SII is the classical
-    Shapley Interaction Index shap's shap_interaction_values (the order-2 oracle)
-    also computes — they're the same quantity by definition, and (after the /2
-    below) now agree exactly (mean_abs_diff ~0.0 on a toy model), confirming this
-    is a real bug fix, not just a closer index label. k-SII is a genuinely
-    different, efficiency-corrected index and was never expected to match.
+    Uses index="SII", not shapiq's default "k-SII": SII is the same classical
+    Shapley Interaction Index as shap's shap_interaction_values (the oracle),
+    so after the /2 correction below they agree exactly. k-SII is a different,
+    efficiency-corrected index and would never match.
 
-    Two corrections vs. shapiq's raw output are needed to recover shap's
-    convention:
-      1. shapiq's get_n_order_values(2) returns the FULL (unhalved) interaction
-         value in both (i, j) and (j, i); shap splits it symmetrically, storing
-         HALF in each of the two cells (so the pair's total effect is
-         cell[i,j] + cell[j,i], each equal). Confirmed empirically: every
-         off-diagonal cell of shapiq's raw matrix was exactly 2x shap's — not an
-         approximate ratio, a fixed factor. Divide by 2 before anything else.
-      2. shapiq's diagonal is zero (pure pairwise terms only), unlike shap/
-         woodelf which fold the remaining main effect onto the diagonal so a row
-         sums to the first-order value. Filled in the same way:
-         diag[i] = SV[i] - sum_{j!=i} interaction[i,j] (using the already-halved
-         off-diagonal values), from the order-1 byproduct of this same call —
-         which, with index="SII", now also matches shap's SV exactly (unlike
-         k-SII's byproduct, which the previous version of this docstring noted
-         differed by ~0.03-0.08 on a toy model; that discrepancy doesn't occur
-         with SII).
+    Two corrections needed to match shap's convention:
+      1. shapiq's get_n_order_values(2) returns the full (unhalved) interaction
+         value in both (i, j) and (j, i); shap splits it symmetrically (half in
+         each cell). Divide by 2.
+      2. shapiq's diagonal is zero; shap/woodelf fold the remaining main effect
+         onto the diagonal so a row sums to the first-order value. Fill it:
+         diag[i] = SV[i] - sum_{j!=i} interaction[i,j], using this call's own
+         order-1 byproduct (which matches shap's SV exactly under SII).
     """
 
     name = "shapiq_interaction"
