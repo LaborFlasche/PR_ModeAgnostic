@@ -11,6 +11,8 @@ class ShapIQApproxBackend(BaseBackend):
         approximator: "kernel" (shapiq.approximator.KernelSHAP) or
             "permutation" (shapiq.approximator.PermutationSamplingSV)
         budget: number of coalitions evaluated per instance (shapiq's budget knob).
+        imputer: value function passed to TabularExplainer ("marginal" default,
+            injected from the config by BenchmarkRunner).
     """
 
     name = "shapiq_approx"
@@ -36,6 +38,7 @@ class ShapIQApproxBackend(BaseBackend):
             "random_state": seed,
             "approximator": self.config.get("approximator", "permutation"),
             "budget": self.config.get("budget"),
+            "imputer": self.config.get("imputer", "marginal"), # value function (config-driven)
         }
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
@@ -49,6 +52,7 @@ class ShapIQApproxBackend(BaseBackend):
         explainer = shapiq.TabularExplainer(
             model=f,
             data=self.background.values.astype(float),
+            imputer=config["imputer"],
             approximator=appr,
             index="SV",
             max_order=1,

@@ -27,6 +27,7 @@ from models.model import Model
 from benchmarking import BenchmarkRunner
 from backends import (
     ShapIQTrueValueBackend,
+    ShapIQApproxBackend,
     ShapIQNNApproxBackend,
     CaptumApproxBackend,
     ShapNNApproxBackend,
@@ -40,6 +41,7 @@ APPROX_MAP = {
     "lightshap": LightShapApproxBackend,
     "dalex": DalexApproxBackend,
     "shapiq_proxy": ShapIQNNApproxBackend,
+    "shapiq": ShapIQApproxBackend,
 }
 
 NN_TRUE_VALUE_MAP = {
@@ -98,9 +100,9 @@ def main():
         print(f"task-id {args.task_id} out of range (max {len(all_runs) - 1})", file=sys.stderr)
         sys.exit(1)
 
-    seed, dk, dp, mk, mp, n_background = all_runs[args.task_id]
-    print(f"[task {args.task_id}] dataset={dk} {dp} | model={mk} {mp} "
-          f"| seed={seed} | n_background={n_background}")
+    seed, dataset, dataset_params, model, model_params, n_background = all_runs[args.task_id]
+    print(f"[task {args.task_id}] dataset={dataset} {dataset_params} "
+          f"| model={model} {model_params} | seed={seed} | n_background={n_background}")
 
     bench = load_bench(args.config)
 
@@ -113,18 +115,17 @@ def main():
     if os.path.exists(output_csv):
         os.remove(output_csv)
 
-    model_enum = Model[mk.upper()]
+    true_value_backends = [
+        NN_TRUE_VALUE_MAP[lib]
+        for lib in bench.get("nn_true_value_libraries", [])
+        if lib in NN_TRUE_VALUE_MAP
+    ]
 
-    true_value_backends = []
-    for lib in bench.get("nn_true_value_libraries", []):
-        cls = NN_TRUE_VALUE_MAP.get(lib)
-        if cls is not None:
-            true_value_backends.append(cls)
-
-    dataset_enum = Dataset[dk.upper()]
-    ds = dataset_enum.load_dataset(**dp, seed=seed)
+    dataset_enum = Dataset[dataset.upper()]
+    ds = dataset_enum.load_dataset(**dataset_params, seed=seed)
     device = bench.get("device", "cpu")
-    trainer = model_enum.get_model_with_params(dataset_enum, {**mp, "device": device}, seed=seed)
+    trainer = Model[model.upper()].get_model_with_params(
+        dataset_enum, {**model_params, "device": device}, seed=seed)
     trainer.fit(ds["X"], ds["y"], task=ds["task"])
 
     runner = BenchmarkRunner(
@@ -140,9 +141,9 @@ def main():
     runner.run(
         model=trainer.get_model(),
         X=ds["X"],
-        run_meta=build_run_meta(dataset=dk, dataset_params=dp, model=mk,
-                                n_background=n_background, device=device,
-                                model_params=mp),
+        run_meta=build_run_meta(dataset=dataset, dataset_params=dataset_params,
+                                model=model, n_background=n_background,
+                                device=device, model_params=model_params),
     )
 
     print(f"[task {args.task_id}] done -> {output_csv}")

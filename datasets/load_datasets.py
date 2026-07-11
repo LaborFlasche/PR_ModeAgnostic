@@ -71,7 +71,16 @@ def _subsample(X: pd.DataFrame, y: pd.Series, n_samples: int,
 
 def _stratified_subsample(X: pd.DataFrame, y: pd.Series, n_samples: int,
                           seed: int) -> tuple[pd.DataFrame, pd.Series]:
-    """Stratified subsample keyed on ``y``; used for very large imbalanced sets."""
+    """Stratified subsample keyed on ``y``; used for very large imbalanced sets.
+
+    ``groupby(y).apply(...)`` concatenates each class's sample in class order,
+    so the result is class-contiguous blocks, not a shuffled draw. Downstream,
+    the runner's background/eval split takes a fixed positional slice of the
+    first rows (see ``BenchmarkRunner._split_data``) rather than sampling
+    randomly, so an unshuffled index leaves that slice single-class whenever a
+    class's stratified count exceeds the slice size. Shuffle the pooled index
+    with the same seed so row order carries no information about ``y``.
+    """
     if n_samples >= len(X):
         return X, y
     frac = n_samples / len(y)
@@ -79,7 +88,9 @@ def _stratified_subsample(X: pd.DataFrame, y: pd.Series, n_samples: int,
         y.groupby(y)
         .apply(lambda g: g.sample(frac=frac, random_state=seed))
         .index.get_level_values(1)
+        .to_numpy()
     )
+    np.random.default_rng(seed).shuffle(idx)
     return X.loc[idx].reset_index(drop=True), y.loc[idx].reset_index(drop=True)
 
 

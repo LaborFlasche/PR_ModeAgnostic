@@ -14,8 +14,7 @@ if [ -z "$CONFIG" ]; then
     echo "Usage: bash slurm/submit.sh <config_path>   (e.g. config-accuracy.yaml or configs/RQ1-accuracy/config-accuracy.yaml)" >&2
     exit 1
 fi
-# Allow passing just the filename: search configs/ (and its RQ*/ subfolders)
-# if not found as given.
+# Allow passing just the filename: search configs/ (and its RQ*/ subfolders).
 if [ ! -f "$CONFIG" ]; then
     FOUND="$(find configs -maxdepth 2 -type f -name "$(basename "$CONFIG")" | head -1)"
     [ -n "$FOUND" ] && CONFIG="$FOUND"

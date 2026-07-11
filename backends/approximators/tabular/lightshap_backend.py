@@ -38,6 +38,7 @@ class LightShapApproxBackend(BaseBackend):
             "random_state": seed,
             "method": self.config.get("approximator", "permutation"),
             "max_iter": self.config.get("budget"),
+            "tol": 0, # disable early stopping so max_iter/budget is the real cap
         }
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:

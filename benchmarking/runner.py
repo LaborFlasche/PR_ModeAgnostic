@@ -32,12 +32,11 @@ RUN_OUTPUT_COLUMNS = {
 
 def spec_key(name: str, approximator=None, budget=None) -> str:
     """pairwise_metrics key for one run spec — single source of truth, shared
-    with scripts/recompute_pairwise_metrics.py. True-value backends run once
-    per class and keep the bare name (merge_fasttreeshap_repair.py looks
-    entries up by name). Approximation specs can share a class (same library,
-    different approximator/budget), so the key must carry both, or specs
-    would overwrite each other's pairwise entries. Budget is normalized
-    through int() since a CSV round-trip turns 256 into 256.0."""
+    with scripts/recompute_pairwise_metrics.py. True-value backends keep the
+    bare backend name (merge_fasttreeshap_repair.py looks entries up by name).
+    Approximation specs can share a class (same library, different
+    approximator/budget), so their key must carry both. Budgets are normalized
+    through int() because a CSV round-trip turns 256 into 256.0."""
     if approximator is None or (isinstance(approximator, float) and np.isnan(approximator)):
         return name
     if isinstance(budget, float) and budget == int(budget):
@@ -46,10 +45,9 @@ def spec_key(name: str, approximator=None, budget=None) -> str:
 
 
 class BenchmarkRunner:
-    """Runs all backends per (model, data) cell and emits pairwise comparison rows.
-
-    Every backend runs once. Then for each ordered pair (candidate, reference)
-    the four accuracy metrics are computed and one CSV row is emitted.
+    """Runs all backends per (model, data) cell and appends one CSV row per
+    backend, each carrying the accuracy metrics against every other backend
+    in its pairwise_metrics column.
     """
 
     def __init__(
@@ -73,6 +71,21 @@ class BenchmarkRunner:
         self.backend_timeout_s = backend_timeout_s
 
     def run(self, model, X: pd.DataFrame, run_meta: dict) -> None:
+        background, X_eval = self._split_data(X)
+
+        # Reference predictions for the additivity check; mean f(background) is
+        # the fallback base value for backends that don't report their own.
+        f = marginal_predict(model, X.columns)
+        eval_preds = np.asarray(f(X_eval), dtype=float)
+        baseline = float(np.mean(np.asarray(f(background), dtype=float)))
+
+        results = self._run_true_value_backends(model, background, X_eval)
+        results += self._run_approximation_specs(model, background, X_eval)
+
+        rows = [self._row(run_meta, r, results, eval_preds, baseline) for r in results]
+        self._append_to_csv(rows)
+
+    def _split_data(self, X: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         if len(X) <= self.n_background:
             raise ValueError(
                 f"X has {len(X)} rows but n_background={self.n_background}; "
@@ -86,85 +99,59 @@ class BenchmarkRunner:
                 "n_features floor in the config."
             )
         background = X.iloc[:self.n_background]
-        if self.n_eval is None:
-            X_eval = X.iloc[self.n_background:]
-        else:
-            X_eval = X.iloc[self.n_background:self.n_background + self.n_eval]
+        end = None if self.n_eval is None else self.n_background + self.n_eval
+        return background, X.iloc[self.n_background:end]
 
-        # Reference predictions/baseline for the additivity check, using mean
-        # f(background) as the fallback base value for marginal-game backends.
-        f = marginal_predict(model, X.columns)
-        eval_preds = np.asarray(f(X_eval), dtype=float)
-        baseline = float(np.mean(np.asarray(f(background), dtype=float)))
-
-        # --- run every backend once, record contributions and metadata ---
-        results: list[dict] = []
-
-        true_value_config = {"n_background": self.n_background}
+    def _run_true_value_backends(self, model, background, X_eval) -> list[dict]:
+        config = {"n_background": self.n_background}
         if self.seed is not None:
-            true_value_config["seed"] = self.seed
-
-        for cls in self.true_value_backends:
-            backend = cls(model, background, true_value_config)
-            t0 = time.perf_counter()
-            try:
-                with time_limit(self.backend_timeout_s):
-                    contrib = backend.run_explainer(X_eval)
-            except BackendTimeout:
-                print(f"  [SKIP] {cls.name}: exceeded {self.backend_timeout_s}s timeout")
-                contrib = self._nan_contrib(cls, X_eval)
-            except Exception as e:
-                print(f"  [BUG] {cls.name} crashed: {e.__class__.__name__}: {e}")
-                contrib = self._nan_contrib(cls, X_eval)
-            runtime = time.perf_counter() - t0
-            results.append({
-                "cls": cls,
+            config["seed"] = self.seed
+        return [
+            {
+                **self._run_backend(cls, model, background, config, X_eval, label=cls.name),
                 "config": {},
-                "contrib": contrib,
-                "runtime": runtime,
                 "n_model_evals": float("nan"),
-                "baseline": backend.baseline_,
-            })
+            }
+            for cls in self.true_value_backends
+        ]
 
-        for cls, config in self.approximation_specs:
-            counter = CountingModel(model)
-            run_config = {**config}
+    def _run_approximation_specs(self, model, background, X_eval) -> list[dict]:
+        results = []
+        for cls, spec in self.approximation_specs:
+            config = {**spec}
             if self.seed is not None:
-                run_config["seed"] = self.seed
+                config["seed"] = self.seed
             if self.imputer is not None:
-                run_config["imputer"] = self.imputer
-            t0 = time.perf_counter()
-            # Same timeout + crash isolation as the true-value loop: one hung or
-            # crashing (library, approximator, budget) combination gets an
-            # all-NaN row instead of killing the whole (model, dataset) cell.
-            # A timed-out row records runtime_s ~= the timeout (right-censored)
-            # — filter NaN-value rows out of mean-runtime aggregations.
-            backend = cls(counter, background, run_config)
-            try:
-                with time_limit(self.backend_timeout_s):
-                    contrib = backend.run_explainer(X_eval)
-            except BackendTimeout:
-                print(f"  [SKIP] {cls.name} ({config}): exceeded {self.backend_timeout_s}s timeout")
-                contrib = nan_result(X_eval)
-            except Exception as e:
-                print(f"  [BUG] {cls.name} ({config}) crashed: {e.__class__.__name__}: {e}")
-                contrib = nan_result(X_eval)
-            runtime = time.perf_counter() - t0
-            results.append({
-                "cls": cls,
-                "config": config,
-                "contrib": contrib,
-                "runtime": runtime,
-                "n_model_evals": counter.n_rows,
-                "baseline": backend.baseline_,
-            })
+                config["imputer"] = self.imputer
+            counter = CountingModel(model)
+            result = self._run_backend(cls, counter, background, config, X_eval,
+                                       label=f"{cls.name} ({spec})")
+            results.append({**result, "config": spec, "n_model_evals": counter.n_rows})
+        return results
 
-        # --- emit one row per backend with pairwise metrics dict ---
-        rows: list[dict] = []
-        for candidate in results:
-            rows.append(self._row(run_meta, candidate, results, eval_preds, baseline))
-
-        self._append_to_csv(rows)
+    def _run_backend(self, cls, model, background, config, X_eval, label: str) -> dict:
+        """Run one backend with timeout and crash isolation: a hung or crashing
+        backend yields an all-NaN result instead of killing the whole
+        (model, dataset) cell. A timed-out row records runtime_s ~= the timeout
+        (right-censored) — filter NaN-value rows out of runtime aggregations."""
+        backend = None
+        t0 = time.perf_counter()
+        try:
+            with time_limit(self.backend_timeout_s):
+                backend = cls(model, background, config)
+                contrib = backend.run_explainer(X_eval)
+        except BackendTimeout:
+            print(f"  [SKIP] {label}: exceeded {self.backend_timeout_s}s timeout")
+            contrib = self._nan_contrib(cls, X_eval)
+        except Exception as e:
+            print(f"  [BUG] {label} crashed: {e.__class__.__name__}: {e}")
+            contrib = self._nan_contrib(cls, X_eval)
+        return {
+            "cls": cls,
+            "contrib": contrib,
+            "runtime": time.perf_counter() - t0,
+            "baseline": backend.baseline_ if backend is not None else None,
+        }
 
     @staticmethod
     def _nan_contrib(cls: Type[BaseBackend], X_eval: pd.DataFrame) -> pd.DataFrame:
@@ -179,26 +166,11 @@ class BenchmarkRunner:
         base = candidate["baseline"] if candidate["baseline"] is not None else baseline
         gap = additivity_gap(c_contrib, eval_preds, base)
 
-        pairwise = {}
-        for reference in all_results:
-            ref_config = reference["config"]
-            ref_name = spec_key(reference["cls"].name,
-                                ref_config.get("approximator"), ref_config.get("budget"))
-            if candidate is reference:
-                pairwise[ref_name] = {
-                    "mean_abs_diff": 0.0,
-                    "relative_mae": 0.0,
-                    "sign_agreement": float(sign_agreement(c_contrib, c_contrib)),
-                    "mean_sample_rho": 1.0,
-                }
-            else:
-                r_contrib = reference["contrib"]
-                pairwise[ref_name] = {
-                    "mean_abs_diff": mean_abs_diff(c_contrib, r_contrib),
-                    "relative_mae": relative_mae(c_contrib, r_contrib),
-                    "sign_agreement": sign_agreement(c_contrib, r_contrib),
-                    "mean_sample_rho": mean_sample_rho(c_contrib, r_contrib),
-                }
+        pairwise = {
+            spec_key(ref["cls"].name, ref["config"].get("approximator"),
+                     ref["config"].get("budget")): self._pair_metrics(candidate, ref)
+            for ref in all_results
+        }
 
         return {
             **run_meta,
@@ -219,6 +191,24 @@ class BenchmarkRunner:
             "shapley_n_eval": c_contrib.shape[0],
             "shapley_n_features": c_contrib.shape[1],
             "pairwise_metrics": json.dumps(pairwise),
+        }
+
+    @staticmethod
+    def _pair_metrics(candidate: dict, reference: dict) -> dict:
+        c_contrib = candidate["contrib"]
+        if candidate is reference:
+            return {
+                "mean_abs_diff": 0.0,
+                "relative_mae": 0.0,
+                "sign_agreement": float(sign_agreement(c_contrib, c_contrib)),
+                "mean_sample_rho": 1.0,
+            }
+        r_contrib = reference["contrib"]
+        return {
+            "mean_abs_diff": mean_abs_diff(c_contrib, r_contrib),
+            "relative_mae": relative_mae(c_contrib, r_contrib),
+            "sign_agreement": sign_agreement(c_contrib, r_contrib),
+            "mean_sample_rho": mean_sample_rho(c_contrib, r_contrib),
         }
 
     def _append_to_csv(self, rows: list[dict]) -> None:

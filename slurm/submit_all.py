@@ -86,6 +86,15 @@ def count_tasks(config_path: str) -> int:
     return len(build_all_runs(config_path))
 
 
+def result_paths(config_key: str) -> tuple[str, str, str]:
+    """(config_path, per-task output dir, merged CSV path) for one config."""
+    config_path = CONFIG_REGISTRY[config_key]["config"]
+    config_name = os.path.basename(config_path).replace(".yaml", "")
+    return (config_path,
+            f"benchmarking/slurm_results/{config_name}",
+            f"benchmarking/results_{config_name}.csv")
+
+
 # ---------------------------------------------------------------------------
 # SLURM helpers
 # ---------------------------------------------------------------------------
@@ -121,9 +130,7 @@ def get_active_job_ids(job_ids: set[int]) -> set[int]:
 def submit_task(config_key: str, task_id: int) -> int | None:
     """Submit one (config, task_id) as a single SLURM job. Returns job ID or None."""
     spec = CONFIG_REGISTRY[config_key]
-    config_path = spec["config"]
-    config_name = os.path.basename(config_path).replace(".yaml", "")
-    output_dir = f"benchmarking/slurm_results/{config_name}"
+    config_path, output_dir, _ = result_paths(config_key)
 
     os.makedirs(os.path.join(REPO_ROOT, output_dir), exist_ok=True)
 
@@ -156,11 +163,7 @@ def submit_task(config_key: str, task_id: int) -> int | None:
 
 def submit_merge(config_key: str) -> None:
     """Submit the merge job for a config (blocks until sbatch returns)."""
-    spec = CONFIG_REGISTRY[config_key]
-    config_path = spec["config"]
-    config_name = os.path.basename(config_path).replace(".yaml", "")
-    input_dir = f"benchmarking/slurm_results/{config_name}"
-    output_csv = f"benchmarking/results_{config_name}.csv"
+    _, input_dir, output_csv = result_paths(config_key)
 
     result = subprocess.run(
         [
@@ -188,19 +191,17 @@ def run(selected: list[str]) -> None:
     pending: list[tuple[str, int]] = []
     print("Config task counts:")
     for key in selected:
-        cfg = CONFIG_REGISTRY[key]["config"]
+        cfg, output_dir, _ = result_paths(key)
         n = count_tasks(cfg)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
         # Clean per-task output dir (same as submit.sh): a previous sweep with
         # a larger grid would leave stale results_<task_id>.csv files behind,
         # leaking old rows into the merged CSV.
-        config_name = os.path.basename(cfg).replace(".yaml", "")
-        output_dir = os.path.join(REPO_ROOT, "benchmarking", "slurm_results", config_name)
+        output_dir = os.path.join(REPO_ROOT, output_dir)
         os.makedirs(output_dir, exist_ok=True)
         for stale in glob.glob(os.path.join(output_dir, "results_*.csv")):
             os.remove(stale)
-        for task_id in range(n):
-            pending.append((key, task_id))
+        pending += [(key, task_id) for task_id in range(n)]
 
     total = len(pending)
     print(f"\nTotal: {total} tasks | MAX_JOBS={MAX_JOBS} | poll every {POLL_INTERVAL}s")
