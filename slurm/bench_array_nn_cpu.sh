@@ -1,20 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=nn_bench
-#SBATCH --partition=NvidiaAll
+#SBATCH --job-name=nn_bench_cpu
+#SBATCH --partition=Krater
 #SBATCH --cpus-per-task=2
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm/logs/bench_nn_%A_%a.out
 #SBATCH --error=slurm/logs/bench_nn_%A_%a.err
-# NN array worker for device=cuda configs. The CIP cluster defines no GPU GRES
-# (sinfo: GRES=(null) everywhere), so --gres/--gpus are rejected — the
-# NvidiaAll partition alone provides the node's GPU. CPU NN configs use
-# bench_array_nn_cpu.sh instead (see select_array_script.sh).
+# CPU counterpart of bench_array_nn.sh, for the device=cpu NN config.
 # --array is set dynamically by submit.sh — do not set it here.
 # $1 = config path, $2 = output dir — passed through by submit.sh.
 
 CONFIG="$1"
 if [ -z "$CONFIG" ]; then
-    echo "bench_array_nn.sh: missing config argument" >&2
+    echo "bench_array_nn_cpu.sh: missing config argument" >&2
     exit 1
 fi
 OUTPUT_DIR="${2:-Benchmarking/slurm_results}"

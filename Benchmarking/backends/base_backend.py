@@ -29,9 +29,11 @@ class BaseBackend(ABC):
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         """Return contributions as a DataFrame of shape (n_samples, n_features)."""
 
-    @abstractmethod
     def load_config(self) -> dict:
-        """Return a config dict for this backend, with default values filled in."""
+        """Config dict with backend-specific defaults filled in; backends that
+        take tuning parameters override this. Not abstract: tree backends have
+        no tunables and don't need it."""
+        return self.config
 
 
 def marginal_predict(model, columns):
