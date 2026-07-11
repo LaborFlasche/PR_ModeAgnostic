@@ -29,6 +29,7 @@ from Models.dataset_and_models import Dataset, Model
 from Benchmarking import BenchmarkRunner
 from Benchmarking.backends import (
     ShapIQTrueValueBackend,
+    ShapIQApproxBackend,
     ShapIQNNApproxBackend,
     CaptumApproxBackend,
     ShapNNApproxBackend,
@@ -42,6 +43,7 @@ APPROX_MAP = {
     "lightshap": LightShapApproxBackend,
     "dalex": DalexApproxBackend,
     "shapiq_proxy": ShapIQNNApproxBackend,
+    "shapiq": ShapIQApproxBackend,
 }
 
 NN_TRUE_VALUE_MAP = {

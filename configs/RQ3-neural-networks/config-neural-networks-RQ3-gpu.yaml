@@ -17,6 +17,7 @@ benchmark:
   #   lightshap    -> kernel, permutation            (model-agnostic)
   #   dalex        -> permutation                    (model-agnostic)
   #   shapiq_proxy -> proxy                          (model-agnostic, ProxySHAP)
+  #   shapiq       -> kernel, permutation            (model-agnostic)
   approx_backends: [captum, shap_nn, lightshap, dalex, shapiq_proxy, shapiq]
   approximators: [gradient_shap, deep_lift_shap, gradient, deep, kernel, permutation, proxy]
   budgets: [512]
