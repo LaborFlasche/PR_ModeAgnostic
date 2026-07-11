@@ -100,7 +100,7 @@ class BenchmarkRunner:
             t0 = time.perf_counter()
             try:
                 with time_limit(self.backend_timeout_s):
-                    contrib = cls(model, background, true_value_config).run_explainer(X_eval)
+                    contrib = backend.run_explainer(X_eval)
             except BackendTimeout:
                 print(f"  [SKIP] {cls.name}: exceeded {self.backend_timeout_s}s timeout")
                 contrib = self._nan_contrib(cls, X_eval)
