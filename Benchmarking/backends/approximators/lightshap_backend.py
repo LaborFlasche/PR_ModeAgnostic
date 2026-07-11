@@ -19,6 +19,12 @@ class LightShapApproxBackend(BaseBackend):
     otherwise compute exact values for small feature counts). lightshap's permutation
     sampling requires at least 4 features, which the config's ``n_features`` floor
     guarantees.
+
+    ``tol=0`` disables lightshap's own convergence check (default ``tol=0.01``
+    stops iterating once estimated standard errors are small enough, independent
+    of ``max_iter``), so ``budget`` is the only thing controlling how much work is
+    done — otherwise most cells converge early and different budgets in the sweep
+    produce identical results.
     """
 
     name = "lightshap_approx"
@@ -38,6 +44,7 @@ class LightShapApproxBackend(BaseBackend):
             "random_state": seed, # seed for shapiq,
             "method": self.config.get("approximator", "permutation"), # shap approximator to use
             "max_iter": self.config.get("budget"),
+            "tol": 0, # disable early stopping so max_iter/budget is the real cap
         }
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
