@@ -1,7 +1,5 @@
 import yaml
 import numpy as np
-from sklearn.model_selection import ParameterGrid
-from Models.dataset_and_models import Dataset, Model
 
 
 def as_list(value):
@@ -69,61 +67,9 @@ def load_config(config_path: str) -> dict:
     return result
 
 
-class TrainedModel:
-    def __init__(self, model_enum, dataset_enum, params: dict, fitted_model):
-        self._model_enum = model_enum
-        self._dataset_enum = dataset_enum
-        self._params = params
-        self._fitted_model = fitted_model
-
-    def get_fitted_model(self):
-        return self._fitted_model
-
-    def get_params(self) -> dict:
-        return self._params
-
-    def get_model_type(self):
-        return self._model_enum
-
-    def get_dataset(self):
-        return self._dataset_enum
-
-
 def load_seed(config_path: str, default: int = 42) -> int:
     """A single benchmark-wide RNG seed (config.yaml -> benchmark.seed)."""
     with open(config_path) as f:
         raw = yaml.safe_load(f)
     seed = (raw.get('benchmark', {}) or {}).get('seed', default)
     return as_list(seed)[0]
-
-
-def generate_trained_models(config_path: str, datasets=None) -> list:
-    if datasets is None:
-        datasets = list(Dataset)
-
-    config = load_config(config_path)
-    seed = load_seed(config_path)
-    result = []
-
-    for model_key, param_grid in config.items():
-        try:
-            model_enum = Model(model_key)
-        except ValueError:
-            continue
-        if model_enum.is_nn:
-            continue
-
-        for params in ParameterGrid(param_grid):
-            for dataset in datasets:
-                data = dataset.load_dataset(seed=seed)
-                trainer = model_enum.get_model_with_params(
-                    dataset, params, seed=seed)
-                trainer.fit(data['X'], data['y'], task=data['task'])
-                result.append(TrainedModel(
-                    model_enum=model_enum,
-                    dataset_enum=dataset,
-                    params=params,
-                    fitted_model=trainer.get_model(),
-                ))
-
-    return result

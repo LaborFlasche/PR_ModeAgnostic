@@ -14,7 +14,6 @@ class LightShapExactBackend(BaseBackend):
     library = "lightshap"
     computation_type = "true_value"
 
-    # To keep everything computational we limit num of features for exact backend to 14 -> we throw a warning
     _EXACT_MAX_FEATURES = 14
 
     def load_config(self):
@@ -23,7 +22,7 @@ class LightShapExactBackend(BaseBackend):
         else:
             raise ValueError("LightShapExactBackend requires a 'seed' in the config.")
         return {
-            "random_state": seed, # seed for lightshap
+            "random_state": seed,
         }
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:

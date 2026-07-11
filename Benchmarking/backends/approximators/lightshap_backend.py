@@ -32,18 +32,17 @@ class LightShapApproxBackend(BaseBackend):
         else:
             raise ValueError("LightShapApproxBackend requires a 'seed' in the config.")
         assert self.config.get("approximator", "permutation") in self.SUPPORTED_APPROXIMATORS, \
-            f"shap approximator must be one of {self.SUPPORTED_APPROXIMATORS} (got {self.config.get('approximator')!r})"
-        
+            f"approximator must be one of {self.SUPPORTED_APPROXIMATORS} (got {self.config.get('approximator')!r})"
+
         return {
-            "random_state": seed, # seed for shapiq,
-            "method": self.config.get("approximator", "permutation"), # shap approximator to use
+            "random_state": seed,
+            "method": self.config.get("approximator", "permutation"),
             "max_iter": self.config.get("budget"),
         }
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         config = self.load_config()
         n_features = x.shape[1]
-        # LightShap sampling requires at least 4 features, so we enforce that here
         if n_features < 4:
             raise ValueError(f"LightShapApproxBackend requires at least 4 features (got {n_features})")
 

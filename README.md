@@ -10,23 +10,19 @@ The goal is to evaluate whether `shapiq` is the best-in-class library for Shaple
 |---|---|---|---|
 | `shapiq` | **Benchmark baseline** | Any-order SII, STI, FSI, … | 20+ interaction indices; exact & approximate |
 | `shap` | Standard SHAP baseline | Pairwise (trees only) | KernelSHAP, PermutationSHAP, and more |
-| `shapr` | Conditional Shapley values | Feature groups | Targets correlated features; R-first, Python wrapper available |
 | `lightshap` | Fast tabular attribution | None (interaction heuristic only) | Zero-dependency; Polars-native; standard errors |
 | `captum` | PyTorch neural networks | Order 1 only | Gradient-based methods; KernelSHAP fully in Torch |
-| `fastshap` | Amortized SHAP approximation | None | Learns a surrogate explainer; trades accuracy for speed |
-| `alibi` | Production XAI toolbox | Via shap | Counterfactual & similarity explanations; shapiq for Shapley |
 | `dalex` | Broad explainability | iBreakDown | Model-agnostic; R-origin, Python port |
-| `shapleyflow` | Graph-based Shapley influence | High-order (graph paths) | Decomposes feature effects into direct vs. mediated paths |
 
-Tree-specific only (not in the table above; see [Tree-specific benchmark](#tree-specific-benchmark)): `woodelf`, `fastTreeSHAP`, `GPUTreeSHAP`.
+Wired into the automated `Benchmarking/` pipeline (`slurm/run_benchmark.py` and `slurm/run_benchmark_nn.py`); tree-specific backends (`woodelf`, `fastTreeSHAP`) are covered separately below.
+
+`Libraries/alibi.ipynb` and `Libraries/shapleyflow.ipynb` hold standalone exploratory comparisons (alibi's KernelShap, shapflow's graph-based path decomposition) that are not wired into the automated sweep above.
 
 ## Research questions
 
 1. Does `shapiq` produce more faithful explanations than single-index competitors on tabular data?
 2. How does runtime scale with number of features and coalition order across libraries?
-3. Where do conditional methods (e.g. `shapr`) diverge from marginal methods (e.g. `shap`, `shapiq`) on correlated datasets?
-4. Can gradient-based attribution (`captum`) match Shapley-based attribution for PyTorch models in quality and speed?
-5. What does `shapleyflow`'s path decomposition reveal that standard interaction indices miss?
+3. Can gradient-based attribution (`captum`) match Shapley-based attribution for PyTorch models in quality and speed?
 
 ## Datasets
 
@@ -44,7 +40,17 @@ Stored in `Datasets/`. See `Datasets/dataset.md` for full details on feature enc
 
 ## Benchmark configuration
 
-Model hyperparameters and dataset sweep ranges are defined in `configs/config.yaml` (model-agnostic) and `configs/RQ4-tree/config-tree.yaml` (tree-specific — see below). Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand either into all benchmark combinations:
+Each research question has its own self-contained config under `configs/`, grouped by RQ:
+
+| Config | Research question |
+|---|---|
+| `configs/RQ1-accuracy/config-accuracy.yaml` | Approximation accuracy vs. budget |
+| `configs/RQ2-dimensionality/config-dimensionality.yaml` (+ `-extreme` variant) | Runtime/accuracy scaling with feature count |
+| `configs/RQ3-neural-networks/config-neural-networks-RQ3-{cpu,gpu}.yaml` | Gradient-based vs. Shapley-based attribution on PyTorch models |
+| `configs/RQ4-tree/config-tree.yaml` (+ `-fasttreeshap` variant) | Tree-specific exact/true-value backends |
+| `configs/RQ5-gpu/config-tree-gpu.yaml` | GPU-backed tree backends |
+
+Each file defines its own `models:` and `datasets:` sections (hyperparameter and sweep ranges) plus a `benchmark:` section (seed, backends, timeouts, …). Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand any one of them into all benchmark combinations:
 
 ```python
 from itertools import product
@@ -52,7 +58,7 @@ from sklearn.model_selection import ParameterGrid
 from Models.config_parser import load_config, load_dataset_config, load_seed
 from Models.dataset_and_models import Dataset
 
-CONFIG = "configs/config.yaml"
+CONFIG = "configs/RQ1-accuracy/config-accuracy.yaml"
 
 model_config   = load_config(CONFIG)        # {model_key: {param: [values]}}
 dataset_config = load_dataset_config(CONFIG) # {dataset_key: {n_features: [...], n_samples: [...]}}
@@ -105,7 +111,7 @@ Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchma
 
 `shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `Benchmarking/backends/trees/tree_shapiq_backend.py`).
 
-GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/RQ5-gpu/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows. XGBoost's native GPU SHAP path under the name `gputreeshap` exists in `Benchmarking/backends/` for future use but isn't wired into any config yet.
+GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/RQ5-gpu/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows.
 
 `configs/RQ4-tree/config-tree.yaml`'s `tree_libraries`/`tree_modes`/`interaction_libraries` control which of the above run; `interaction_max_features` caps interaction sweeps since their output is quadratic in feature count.
 
@@ -125,57 +131,50 @@ This creates a `.venv` and installs all dependencies from `uv.lock` in one step.
 
 ### Run notebooks
 
-```bash
-Go to the notebook and run it using the venv from uv.
-```
+Open any notebook under `Libraries/` in Jupyter/VS Code and select the `.venv` created by `uv sync` as its kernel.
 
 ### Run scripts
 
 ```bash
-uv run Models/load_and_train.py
+uv run python slurm/run_benchmark.py --task-id 0 --config configs/RQ1-accuracy/config-accuracy.yaml
 ```
 
-### shapr (optional)
-
-**shapr** requires R in addition to the Python wrapper:
+### Run tests
 
 ```bash
-# Install R >= 4.3 via https://cran.r-project.org, then:
-Rscript -e "install.packages('shapr')"
-uv add shaprpy rpy2
+uv run pytest tests/
 ```
 
 ## Project structure
 
 ```
 Libraries/
-  shapiq.ipynb            # Benchmark baseline
-  shap.ipynb              # Standard SHAP baseline
-  shapr.ipynb             # Conditional Shapley values
-  lightshap.ipynb         # Fast tabular attribution, zero-dependency
-  captum.ipynb            # PyTorch attribution (IG, KernelSHAP, …)
-  fastshap.ipynb          # Amortized SHAP approximation
-  alibi.ipynb             # Production XAI — counterfactuals, anchors
-  dalex.ipynb             # iBreakDown, PDP, variable importance
-  shapleyflow.ipynb       # Graph-based path-decomposed Shapley values
-  library_merge.ipynb     # Model-agnostic sweep, interactive equivalent of run_benchmark.py
+  shapiq.ipynb             # Benchmark baseline
+  shap.ipynb               # Standard SHAP baseline
+  lightshap.ipynb          # Fast tabular attribution, zero-dependency
+  captum.ipynb             # PyTorch attribution (IG, KernelSHAP, …)
+  dalex.ipynb              # iBreakDown, PDP, variable importance
+  alibi.ipynb              # Standalone exploratory comparison — alibi's KernelShap
+  shapleyflow.ipynb / shapleyflow_with.ipynb  # Standalone exploratory comparison — graph-based path decomposition
+  library_merge.ipynb      # Model-agnostic sweep, interactive equivalent of run_benchmark.py
   tree_library_merge.ipynb # Tree-specific sweep, interactive equivalent of run_benchmark.py --config configs/RQ4-tree/config-tree.yaml
 Models/
-  dataset_and_models.py   # Dataset and Model enums / definitions
-  trainers.py             # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
-  config_parser.py        # load_config / load_dataset_config — expand config.yaml into parameter lists
-  load_and_train.py       # TrainingConfig — pairs a dataset with a model and exposes train()
+  dataset_and_models.py    # Dataset and Model enums / definitions
+  trainers.py              # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
+  config_parser.py         # load_config / load_dataset_config — expand a config.yaml into parameter lists
+  load_and_train.py        # TrainingConfig — pairs a dataset with a model and exposes train()
 Datasets/
-  load_datasets.py        # Dataset download and caching helpers (support n_features / n_samples)
-  dataset.md              # Dataset documentation incl. encoding strategy and feature-selection notes
+  load_datasets.py         # Dataset download and caching helpers (support n_features / n_samples)
+  dataset.md               # Dataset documentation incl. encoding strategy and feature-selection notes
 Benchmarking/
   runner.py                # BenchmarkRunner — runs one oracle + backends/approximations per cell
   metrics.py                # mean_abs_diff, sign_agreement, mean_sample_rho, runtime
-  backends/                 # one BaseBackend subclass per (library, mode); tree_*.py / woodelf_backend.py /
-                             # fasttreeshap_backend.py / gputreeshap_backend.py are the tree-specific ones
+  backends/
+    true_value/            # exact/reference backends (shap, shapiq, lightshap, dalex)
+    approximators/          # approximate backends (shap, shapiq, lightshap, dalex, captum, shap_nn)
+    trees/                  # tree-specific backends (shap, shapiq, woodelf, fasttreeshap)
 configs/
-  config.yaml               # Model-agnostic benchmark config (hyperparameters, dataset sweeps, approximators)
-  config-tree.yaml          # Tree-specific config — see "Tree-specific benchmark" above
+  RQ1-accuracy/ … RQ5-gpu/  # one self-contained config per research question — see "Benchmark configuration" above
 slurm/                      # SLURM array-job scripts; see SLURM.md
 scripts/
   setup_fasttreeshap_env.sh # Provisions the dedicated venv fasttreeshap runs in (numpy<2)

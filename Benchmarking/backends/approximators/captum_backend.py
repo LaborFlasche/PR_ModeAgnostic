@@ -49,7 +49,7 @@ class CaptumApproxBackend(BaseBackend):
         if approximator not in self.SUPPORTED_APPROXIMATORS:
             raise ValueError(
                 f"Unknown captum approximator '{approximator}' "
-                f"(use {self._APPROXIMATORS})"
+                f"(use {self.SUPPORTED_APPROXIMATORS})"
             )
 
         target = self.config.get("target")

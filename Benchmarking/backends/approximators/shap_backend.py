@@ -25,13 +25,12 @@ class ShapApproxBackend(BaseBackend):
             raise ValueError("ShapApproxBackend requires a 'seed' in the config.")
         assert self.config.get("approximator", "permutation") in self.SUPPORTED_APPROXIMATORS, \
             f"shap approximator must be one of {self.SUPPORTED_APPROXIMATORS} (got {self.config.get('approximator')!r})"
-        
+
         return {
-            "random_state": seed, # seed for shap,
-            "approximator": self.config.get("approximator", "permutation"), # shap approximator to use
+            "random_state": seed,
+            "approximator": self.config.get("approximator", "permutation"),
             "budget": self.config.get("budget"),
         }
-        
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
         config = self.load_config()
@@ -47,7 +46,7 @@ class ShapApproxBackend(BaseBackend):
             masker = shap.maskers.Independent(self.background, max_samples=len(self.background))
             explainer = shap.PermutationExplainer(f, masker, seed=config["random_state"], silent=True)
             # PermutationExplainer needs at least 2*n_features+1 evals per instance;
-            # if max_evals is less than that i will throw an error resulting in NaN values
+            # a smaller max_evals raises, which the runner catches as a NaN row.
             values = np.asarray(explainer(x, max_evals=config["budget"] , l1_reg=False, silent=True).values)
         else:
             raise ValueError(f"Unknown shap approximator '{config['approximator']}' (use 'kernel' or 'permutation')")

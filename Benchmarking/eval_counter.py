@@ -37,10 +37,6 @@ class CountingModel:
             return fn(X, *args, **kwargs)
         return counted
 
-    def reset(self) -> None:
-        self.n_calls = 0
-        self.n_rows = 0
-
     def __getattr__(self, item):
         # Reached only for attributes not found on CountingModel itself; raises
         # AttributeError if the wrapped model lacks the attribute (so hasattr works).

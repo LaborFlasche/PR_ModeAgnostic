@@ -32,11 +32,11 @@ class DalexApproxBackend(BaseBackend):
         else:
             raise ValueError("DalexApproxBackend requires a 'seed' in the config.")
         assert self.config.get("approximator", "permutation") in self.SUPPORTED_APPROXIMATORS, \
-            f"shap approximator must be one of {self.SUPPORTED_APPROXIMATORS} (got {self.config.get('approximator')!r})"
-        
+            f"approximator must be one of {self.SUPPORTED_APPROXIMATORS} (got {self.config.get('approximator')!r})"
+
         return {
-            "random_state": seed, # seed for shap,
-            "approximator": self.config.get("approximator", "permutation"), # shap approximator to use
+            "random_state": seed,
+            "approximator": self.config.get("approximator", "permutation"),
             "budget": self.config.get("budget"),
         }
 
@@ -44,7 +44,6 @@ class DalexApproxBackend(BaseBackend):
         config = self.load_config()
         columns = list(x.columns)
         n_features = x.shape[1]
-
 
         B = max(1, round(config["budget"]/n_features))
 

@@ -1,7 +1,5 @@
 from Models.dataset_and_models import Dataset, Model
 
-"""This file contains functions to load and train models on the different datasets."""
-
 
 class TrainingConfig:
     """Configuration for training a model on a dataset.
@@ -32,7 +30,7 @@ class TrainingConfig:
 
     @staticmethod
     def get_all_configs(pytorch: bool) -> list:
-        # Get all combinations of datasets and models -> Return a list of TrainingConfig objects
+        """All (dataset, model) combinations, one TrainingConfig each."""
         configs = []
         for dataset in Dataset:
             for model in Model.get_models(pytorch):

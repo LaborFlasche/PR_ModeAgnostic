@@ -44,7 +44,7 @@ class CaptumApproxBackend(BaseBackend):
 
 ### On running the benchmarker
 
-See Libraries\library_merge.ipynb for an implementation.
+See `Libraries/library_merge.ipynb` for an implementation.
 
 The runner takes **one exact oracle** (computed once per cell) plus a list of
 **approximation specs** — `(backend_class, config)` pairs, where `config` carries the
@@ -58,8 +58,8 @@ predict-counter so the real number of model evaluations is recorded.
 > appears only as an *approximation* backend. The polynomial oracle is validated once
 > against brute-force exact in the notebook's "Ground-truth validation" section.
 
-> **Reproducibility & control via the config.** Two `benchmark` fields in
-> `configs/config.yaml` are the single source of truth for the experiment, with no
+> **Reproducibility & control via the config.** Two `benchmark` fields in each
+> `configs/RQ*/*.yaml` are the single source of truth for the experiment, with no
 > hardcoded fallbacks downstream:
 > - `seed` — threaded into data subsampling, model training (every estimator's
 >   `random_state`), and every stochastic approximator, so changing it reseeds the whole

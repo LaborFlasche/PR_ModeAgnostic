@@ -18,8 +18,8 @@ class ShapTrueValueBackend(BaseBackend):
         else:
             raise ValueError("ShapTrueValueBackend requires a 'seed' in the config.")
         return {
-            "random_state": seed, # seed for shap,
-            "n_background": self.config.get("n_background", 100), # number of background samples for shap
+            "random_state": seed,
+            "n_background": self.config.get("n_background", 100),
         }
 
 
@@ -37,7 +37,8 @@ class ShapTrueValueBackend(BaseBackend):
         # Because shap.Exact does not take a seed argument, we seed the global RNG for reproducibility.
         np.random.seed(config["random_state"])
         f = marginal_predict(self.model, x.columns)
-        # Shap exact explainer needs a masker but this masker is never called because len(self.backgound ) = max_samples
+        # shap.Exact needs a masker, but it's never actually invoked here because
+        # max_samples == len(self.background), so every row is used directly.
         explainer = shap.explainers.Exact(f, shap.maskers.Independent(self.background, max_samples=len(self.background)))
         sv = explainer(x)
         values = sv.values

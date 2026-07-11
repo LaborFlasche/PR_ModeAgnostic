@@ -4,12 +4,6 @@
 # Run it again with a different config (e.g. configs/RQ4-tree/config-tree.yaml)
 # for another sweep — each config gets its own output directory and merged CSV
 # so the runs don't collide and can be submitted in parallel.
-# Run this from the repo root:  bash slurm/submit.sh [config_path]
-# Defaults to configs/config.yaml (model-agnostic). Run again with
-# configs/RQ4-tree/config-tree.yaml for the tree-specific sweep, or
-# configs/RQ5-gpu/config-tree-gpu.yaml for the woodelf cpu-vs-gpu sweep (runs
-# on a GPU node, see slurm/bench_array_gpu.sh) — each config gets its own
-# output directory and merged CSV so the runs don't collide.
 # It submits the array job and then a merge job that waits for it.
 
 set -e

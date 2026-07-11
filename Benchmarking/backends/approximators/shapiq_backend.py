@@ -28,13 +28,13 @@ class ShapIQApproxBackend(BaseBackend):
         if "seed" in self.config and self.config["seed"] is not None:
             seed = self.config["seed"]
         else:
-            raise ValueError("ShapIQTrueValueBackend requires a 'seed' in the config.")
+            raise ValueError("ShapIQApproxBackend requires a 'seed' in the config.")
         assert self.config.get("approximator", "permutation") in self.SUPPORTED_APPROXIMATORS, \
-            f"shap approximator must be one of {self.SUPPORTED_APPROXIMATORS} (got {self.config.get('approximator')!r})"
-        
+            f"approximator must be one of {self.SUPPORTED_APPROXIMATORS} (got {self.config.get('approximator')!r})"
+
         return {
-            "random_state": seed, # seed for shapiq,
-            "approximator": self.config.get("approximator", "permutation"), # shap approximator to use
+            "random_state": seed,
+            "approximator": self.config.get("approximator", "permutation"),
             "budget": self.config.get("budget"),
         }
 

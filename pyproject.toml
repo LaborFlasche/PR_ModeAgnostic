@@ -8,7 +8,7 @@ packages = ["Models", "Datasets"]
 [project]
 name = "pr-modeagnostic"
 version = "0.1.0"
-description = "Add your description here"
+description = "Model-agnostic Shapley value XAI benchmark"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -31,10 +31,10 @@ dependencies = [
     "cupy-cuda12x>=13.0 ; sys_platform == 'linux'",
     "xgboost>=2.0.0",
     "dalex>=1.7.2",
-    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]
 dev = [
     "ipykernel>=7.2.0",
+    "pytest>=9.0",
 ]

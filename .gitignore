@@ -26,5 +26,6 @@ __pycache__/
 
 # Local results / scratch
 res.png
+results_*.csv
 slurm/logs/
 slurm_results/

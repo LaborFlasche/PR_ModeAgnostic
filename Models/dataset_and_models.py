@@ -25,8 +25,6 @@ from Datasets.load_datasets import Dataset  # noqa: F401  (re-export)
 from Models.trainers import SklearnTrainer, PytorchTrainer
 from enum import Enum
 
-"""This file contains functions to load and train models on the different datasets."""
-
 
 def actual_max_depth(model) -> int:
     """Deepest root-to-leaf path actually grown in a fitted tree model/ensemble.
@@ -62,20 +60,20 @@ def actual_max_depth(model) -> int:
 
 
 class Model(Enum):
-    # 1) Lineare Baselines
+    # 1) Linear baselines
     LINEAR_BASELINE = "linear_baseline"
     LINEAR_REGULARIZED = "linear_regularized"
 
-    # 2) Einfache Bäume
+    # 2) Single decision tree
     DECISION_TREE = "decision_tree"
 
-    # 4) Baum-Ensembles
+    # 3) Tree ensembles
     RANDOM_FOREST = "random_forest"
     GRADIENT_BOOSTING = "gradient_boosting"
     XGBOOST = "xgboost"
     LIGHTGBM = "lightgbm"
 
-    # 3) Neuronale Netzwerke (PyTorch)
+    # 4) Neural networks (PyTorch)
     # Config-driven architectures (config-neural-networks-RQ3.yaml); values match
     # PytorchTrainer._ARCH_REGISTRY keys so architecture=self.value dispatches.
     MLP = "mlp"

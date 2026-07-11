@@ -5,7 +5,7 @@ from ..base_backend import BaseBackend, marginal_predict
 
 
 class ShapIQTrueValueBackend(BaseBackend):
-    """"""
+    """Exact Shapley values via shapiq's TabularExplainer (budget = 2^n_features)."""
 
     name = "shapiq_true_value"
     library = "shapiq"
@@ -19,7 +19,7 @@ class ShapIQTrueValueBackend(BaseBackend):
         else:
             raise ValueError("ShapIQTrueValueBackend requires a 'seed' in the config.")
         return {
-            "random_state": seed, # seed for shapiq
+            "random_state": seed,
         }
 
     def run_explainer(self, x: pd.DataFrame) -> pd.DataFrame:
