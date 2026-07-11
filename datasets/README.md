@@ -7,7 +7,7 @@ A curated set of tabular datasets used to evaluate XAI libraries. They are chose
 The whole module is one enum. Each `Dataset` member _is_ a supported dataset, and its value is a `DatasetSpec` describing how to fetch and preprocess it. There is **no** parallel string registry and **no** per-dataset `load_x()` helper — the previous design had both and it was redundant.
 
 ```python
-from Datasets.load_datasets import Dataset, load_dataset, load_all_datasets
+from datasets.load_datasets import Dataset, load_dataset, load_all_datasets
 
 # load one, via the enum member …
 ds = Dataset.ADULT_CENSUS.load_dataset(n_samples=1_000, n_features=8, seed=42)

@@ -15,14 +15,14 @@ from sklearn.tree import (
 )
 # xgboost/lightgbm are imported lazily below (not at module level): importing
 # xgboost before shapiq segfaults shapiq's interventional TreeExplainer later —
-# see tree_shapiq_backend.py.
+# see trees/shapiq_backend.py.
 
 # The Dataset enum (and its DatasetSpec-based loading) lives in one place —
-# Datasets/load_datasets.py — and is re-exported here so existing imports
-# (`from Models.dataset_and_models import Dataset, Model`) keep working.
-from Datasets.load_datasets import Dataset  # noqa: F401  (re-export)
+# datasets/load_datasets.py — and is re-exported here so existing imports
+# (`from models.dataset_and_models import Dataset, Model`) keep working.
+from datasets.load_datasets import Dataset  # noqa: F401  (re-export)
 
-from Models.trainers import SklearnTrainer, PytorchTrainer
+from models.trainers import SklearnTrainer, PytorchTrainer
 from enum import Enum
 
 
@@ -74,7 +74,7 @@ class Model(Enum):
     LIGHTGBM = "lightgbm"
 
     # 4) Neural networks (PyTorch)
-    # Config-driven architectures (config-neural-networks-RQ3.yaml); values match
+    # Config-driven architectures (config-neural-networks.yaml); values match
     # PytorchTrainer._ARCH_REGISTRY keys so architecture=self.value dispatches.
     MLP = "mlp"
     TRANSFORMER = "transformer"

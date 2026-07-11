@@ -64,7 +64,7 @@ models:
 # Feature counts are log-spaced, not linear: approximation quality and cost bend
 # hardest in the low range (4 -> ~128) and flatten after, so dense low / sparse high
 # samples the informative part. Counts are realized as the top-N highest-variance
-# columns of each dataset (see Datasets/load_datasets.py). gisette is capped at 256:
+# columns of each dataset (see datasets/load_datasets.py). gisette is capped at 256:
 # with a fixed budget of 64, KernelSHAP becomes pure noise far beyond that (you cannot
 # estimate hundreds of Shapley values from 64 coalition samples), so wider cells would
 # cost most of the runtime while producing uncomparable results. Three datasets cover

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestRegressor
-from Benchmarking.backends.true_value.shap_backend import ShapTrueValueBackend
+from benchmarking.backends.true_value.shap_backend import ShapTrueValueBackend
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_shap_true_value_metadata():
     assert ShapTrueValueBackend.name == "shap_true_value"
 
 
-from Benchmarking.backends.true_value.shapiq_backend import ShapIQTrueValueBackend
+from benchmarking.backends.true_value.shapiq_backend import ShapIQTrueValueBackend
 
 
 def test_shapiq_true_value_shape(toy_rf):
@@ -67,10 +67,10 @@ def test_shapiq_true_value_metadata():
     assert ShapIQTrueValueBackend.name == "shapiq_true_value"
 
 
-from Benchmarking.backends.trees.tree_shap_backend import ShapTreePathDependentBackend
+from benchmarking.backends.trees.shap_backend import ShapTreePathDependentBackend
 # ShapIQTreeInterventionalBackend not exercised here: it crashes unreliably (see its docstring).
-from Benchmarking.backends.trees.tree_shapiq_backend import ShapIQTreePathDependentBackend
-from Benchmarking.backends.trees.woodelf_backend import (
+from benchmarking.backends.trees.shapiq_backend import ShapIQTreePathDependentBackend
+from benchmarking.backends.trees.woodelf_backend import (
     WoodelfTreePathDependentBackend,
     WoodelfTreeInterventionalBackend,
 )
@@ -108,7 +108,7 @@ def test_woodelf_skips_multiclass():
     assert contrib.isna().all().all()
 
 
-from Benchmarking.backends.trees.fasttreeshap_backend import FastTreeShapBackend
+from benchmarking.backends.trees.fasttreeshap_backend import FastTreeShapBackend
 
 
 def test_fasttreeshap_skips_when_venv_missing(toy_rf, monkeypatch):
@@ -122,7 +122,7 @@ def test_fasttreeshap_skips_when_venv_missing(toy_rf, monkeypatch):
     assert contrib.isna().all().all()
 
 
-from Models.dataset_and_models import Model
+from models.dataset_and_models import Model
 
 
 def test_model_is_tree():
@@ -152,7 +152,7 @@ class _FakeXGBClassifier:
 
 
 def test_marginal_predict_xgboost_classifier_uses_margin():
-    from Benchmarking.backends.base_backend import marginal_predict
+    from benchmarking.backends.base_backend import marginal_predict
     X = pd.DataFrame(np.zeros((5, 3)), columns=["f0", "f1", "f2"])
     f = marginal_predict(_FakeXGBClassifier(), X.columns)
     np.testing.assert_allclose(f(X), np.arange(5, dtype=float))
@@ -160,9 +160,9 @@ def test_marginal_predict_xgboost_classifier_uses_margin():
 
 # --- Interaction (order-2) backends -----------------------------------------
 
-from Benchmarking.backends.trees.tree_shap_backend import ShapInteractionBackend
-from Benchmarking.backends.trees.tree_shapiq_backend import ShapIQInteractionBackend
-from Benchmarking.backends.trees.woodelf_backend import WoodelfInteractionBackend
+from benchmarking.backends.trees.shap_backend import ShapInteractionBackend
+from benchmarking.backends.trees.shapiq_backend import ShapIQInteractionBackend
+from benchmarking.backends.trees.woodelf_backend import WoodelfInteractionBackend
 
 
 @pytest.mark.parametrize("backend_cls", [
@@ -305,7 +305,7 @@ def test_shapiq_interaction_matches_oracle(toy_rf):
 
 # --- GPU-gated backends: skip-path only (no CUDA on this machine) -----------
 
-from Benchmarking.backends.trees.woodelf_backend import (
+from benchmarking.backends.trees.woodelf_backend import (
     WoodelfGPUPathDependentBackend,
     WoodelfGPUInterventionalBackend,
 )
@@ -316,7 +316,7 @@ from Benchmarking.backends.trees.woodelf_backend import (
     WoodelfGPUInterventionalBackend,
 ])
 def test_woodelf_gpu_skips_without_cuda(toy_rf, backend_cls, monkeypatch):
-    monkeypatch.setattr("Benchmarking.backends.trees.woodelf_backend.cuda_available", lambda: False)
+    monkeypatch.setattr("benchmarking.backends.trees.woodelf_backend.cuda_available", lambda: False)
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]

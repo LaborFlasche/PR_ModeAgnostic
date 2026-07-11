@@ -9,7 +9,7 @@ true-value backends that auto-select their approximator (shapiq).
 Usage:
     python slurm/run_benchmark_nn.py --task-id $SLURM_ARRAY_TASK_ID
 
-Run from the repo root so that Models/, Benchmarking/, configs/ are importable.
+Run from the repo root so that models/, benchmarking/, configs/ are importable.
 """
 import argparse
 import json
@@ -24,10 +24,10 @@ warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", categ
 import yaml
 from sklearn.model_selection import ParameterGrid
 
-from Models.config_parser import load_config, load_dataset_config, as_list
-from Models.dataset_and_models import Dataset, Model
-from Benchmarking import BenchmarkRunner
-from Benchmarking.backends import (
+from models.config_parser import load_config, load_dataset_config, as_list
+from models.dataset_and_models import Dataset, Model
+from benchmarking import BenchmarkRunner
+from benchmarking.backends import (
     ShapIQTrueValueBackend,
     ShapIQNNApproxBackend,
     CaptumApproxBackend,
@@ -113,8 +113,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
-    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml")
-    parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
+    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-gpu.yaml")
+    parser.add_argument("--output-dir", default="benchmarking/slurm_results")
     args = parser.parse_args()
 
     all_runs = build_all_runs(args.config)

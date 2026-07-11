@@ -2,8 +2,8 @@
 """Merges all per-task CSVs from an input directory into a single output CSV.
 
 Usage: python slurm/merge_results.py [--input-dir DIR] [--output-csv FILE]
-Defaults match the original single-config layout (Benchmarking/slurm_results/
--> Benchmarking/results.csv); pass both when merging a tree-config run, whose
+Defaults match the original single-config layout (benchmarking/slurm_results/
+-> benchmarking/results.csv); pass both when merging a tree-config run, whose
 array tasks write to a separate directory (see submit.sh).
 """
 import argparse
@@ -15,8 +15,8 @@ import pandas as pd
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input-dir", default="Benchmarking/slurm_results")
-    parser.add_argument("--output-csv", default="Benchmarking/results.csv")
+    parser.add_argument("--input-dir", default="benchmarking/slurm_results")
+    parser.add_argument("--output-csv", default="benchmarking/results.csv")
     args = parser.parse_args()
 
     input_glob = f"{args.input_dir}/results_*.csv"

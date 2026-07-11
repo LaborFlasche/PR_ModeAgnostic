@@ -27,7 +27,7 @@ sys.path.insert(0, REPO_ROOT)
 
 import yaml
 from sklearn.model_selection import ParameterGrid
-from Models.config_parser import load_config, load_dataset_config, as_list
+from models.config_parser import load_config, load_dataset_config, as_list
 
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls
@@ -63,12 +63,12 @@ CONFIG_REGISTRY = {
         "worker": "slurm/run_benchmark.py",
     },
     "nn": {
-        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-gpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
     "nn-cpu": {
-        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-cpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
     },
     "tree-gpu": {
@@ -136,7 +136,7 @@ def submit_task(config_key: str, task_id: int) -> int | None:
     spec = CONFIG_REGISTRY[config_key]
     config_path = spec["config"]
     config_name = os.path.basename(config_path).replace(".yaml", "")
-    output_dir = f"Benchmarking/slurm_results/{config_name}"
+    output_dir = f"benchmarking/slurm_results/{config_name}"
 
     os.makedirs(os.path.join(REPO_ROOT, output_dir), exist_ok=True)
 
@@ -172,8 +172,8 @@ def submit_merge(config_key: str) -> None:
     spec = CONFIG_REGISTRY[config_key]
     config_path = spec["config"]
     config_name = os.path.basename(config_path).replace(".yaml", "")
-    input_dir = f"Benchmarking/slurm_results/{config_name}"
-    output_csv = f"Benchmarking/results_{config_name}.csv"
+    input_dir = f"benchmarking/slurm_results/{config_name}"
+    output_csv = f"benchmarking/results_{config_name}.csv"
 
     result = subprocess.run(
         [
@@ -209,7 +209,7 @@ def run(selected: list[str]) -> None:
         # larger grid would leave higher-numbered files behind and leak stale
         # rows into the merged CSV.
         config_name = os.path.basename(cfg).replace(".yaml", "")
-        output_dir = os.path.join(REPO_ROOT, "Benchmarking", "slurm_results", config_name)
+        output_dir = os.path.join(REPO_ROOT, "benchmarking", "slurm_results", config_name)
         os.makedirs(output_dir, exist_ok=True)
         for stale in glob.glob(os.path.join(output_dir, "results_*.csv")):
             os.remove(stale)

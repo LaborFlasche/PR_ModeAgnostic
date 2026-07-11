@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
-from Benchmarking.runner import BenchmarkRunner
-from Benchmarking.backends.true_value.shap_backend import ShapTrueValueBackend
-from Benchmarking.backends.true_value.shapiq_backend import ShapIQTrueValueBackend
+from benchmarking.runner import BenchmarkRunner
+from benchmarking.backends.true_value.shap_backend import ShapTrueValueBackend
+from benchmarking.backends.true_value.shapiq_backend import ShapIQTrueValueBackend
 
 
 @pytest.fixture

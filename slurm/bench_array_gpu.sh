@@ -15,5 +15,5 @@
 
 # Run from repo root (submit.sh does: sbatch --chdir=<repo_root> ...)
 CONFIG="${1:-configs/RQ5-gpu/config-tree-gpu.yaml}"
-OUTPUT_DIR="${2:-Benchmarking/slurm_results}"
+OUTPUT_DIR="${2:-benchmarking/slurm_results}"
 ~/.local/bin/uv run python slurm/run_benchmark.py --task-id "$SLURM_ARRAY_TASK_ID" --config "$CONFIG" --output-dir "$OUTPUT_DIR"

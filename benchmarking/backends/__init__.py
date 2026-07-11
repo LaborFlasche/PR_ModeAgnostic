@@ -11,8 +11,8 @@ from .approximators.dalex_backend import DalexApproxBackend
 from .approximators.captum_backend import CaptumApproxBackend
 from .approximators.shap_nn_backend import ShapNNApproxBackend
 
-from .trees.tree_shap_backend import ShapTreePathDependentBackend, ShapInteractionBackend
-from .trees.tree_shapiq_backend import (
+from .trees.shap_backend import ShapTreePathDependentBackend, ShapInteractionBackend
+from .trees.shapiq_backend import (
     ShapIQTreePathDependentBackend,
     ShapIQTreeInterventionalBackend,
     ShapIQInteractionBackend,

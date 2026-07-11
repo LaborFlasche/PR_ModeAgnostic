@@ -14,9 +14,7 @@ The goal is to evaluate whether `shapiq` is the best-in-class library for Shaple
 | `captum` | PyTorch neural networks | Order 1 only | Gradient-based methods; KernelSHAP fully in Torch |
 | `dalex` | Broad explainability | iBreakDown | Model-agnostic; R-origin, Python port |
 
-Wired into the automated `Benchmarking/` pipeline (`slurm/run_benchmark.py` and `slurm/run_benchmark_nn.py`); tree-specific backends (`woodelf`, `fastTreeSHAP`) are covered separately below.
-
-`Libraries/alibi.ipynb` and `Libraries/shapleyflow.ipynb` hold standalone exploratory comparisons (alibi's KernelShap, shapflow's graph-based path decomposition) that are not wired into the automated sweep above.
+Wired into the automated `benchmarking/` pipeline (`slurm/run_benchmark.py` and `slurm/run_benchmark_nn.py`); tree-specific backends (`woodelf`, `fastTreeSHAP`) are covered separately below.
 
 ## Research questions
 
@@ -26,7 +24,7 @@ Wired into the automated `Benchmarking/` pipeline (`slurm/run_benchmark.py` and 
 
 ## Datasets
 
-Stored in `Datasets/`. See `Datasets/dataset.md` for full details on feature encoding and the feature-selection strategy used for experiments.
+Stored in `datasets/`. See `datasets/README.md` for full details on feature encoding and the feature-selection strategy used for experiments.
 
 | Dataset | Task | Samples | Features | Source |
 |---|---|---|---|---|
@@ -46,17 +44,17 @@ Each research question has its own self-contained config under `configs/`, group
 |---|---|
 | `configs/RQ1-accuracy/config-accuracy.yaml` | Approximation accuracy vs. budget |
 | `configs/RQ2-dimensionality/config-dimensionality.yaml` (+ `-extreme` variant) | Runtime/accuracy scaling with feature count |
-| `configs/RQ3-neural-networks/config-neural-networks-RQ3-{cpu,gpu}.yaml` | Gradient-based vs. Shapley-based attribution on PyTorch models |
+| `configs/RQ3-neural-networks/config-neural-networks-{cpu,gpu}.yaml` | Gradient-based vs. Shapley-based attribution on PyTorch models |
 | `configs/RQ4-tree/config-tree.yaml` (+ `-fasttreeshap` variant) | Tree-specific exact/true-value backends |
 | `configs/RQ5-gpu/config-tree-gpu.yaml` | GPU-backed tree backends |
 
-Each file defines its own `models:` and `datasets:` sections (hyperparameter and sweep ranges) plus a `benchmark:` section (seed, backends, timeouts, …). Use `load_config` and `load_dataset_config` from `Models/config_parser.py` to expand any one of them into all benchmark combinations:
+Each file defines its own `models:` and `datasets:` sections (hyperparameter and sweep ranges) plus a `benchmark:` section (seed, backends, timeouts, …). Use `load_config` and `load_dataset_config` from `models/config_parser.py` to expand any one of them into all benchmark combinations:
 
 ```python
 from itertools import product
 from sklearn.model_selection import ParameterGrid
-from Models.config_parser import load_config, load_dataset_config, load_seed
-from Models.dataset_and_models import Dataset
+from models.config_parser import load_config, load_dataset_config, load_seed
+from models.dataset_and_models import Dataset
 
 CONFIG = "configs/RQ1-accuracy/config-accuracy.yaml"
 
@@ -98,8 +96,6 @@ Tree models (`xgboost`, `lightgbm`, and any sklearn tree model) can additionally
 uv run python slurm/run_benchmark.py --task-id 0 --config configs/RQ4-tree/config-tree.yaml
 ```
 
-Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchmark.py`'s sweep against `configs/RQ4-tree/config-tree.yaml` for interactive use.
-
 | Library | Modes | Order-2 interactions |
 |---|---|---|
 | `shap` (TreeSHAP) | path-dependent | yes — order-2 oracle |
@@ -109,7 +105,7 @@ Or run `Libraries/tree_library_merge.ipynb` directly — it mirrors `run_benchma
 
 `fasttreeshap` requires `numpy<2`, incompatible with this project's main `numpy>=2` stack, so it runs out-of-process in a dedicated venv — provision it once with `bash scripts/setup_fasttreeshap_env.sh`. It also can't parse XGBoost 3.x's model format (an upstream limitation) and is skipped for XGBoost models specifically.
 
-`shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `Benchmarking/backends/trees/tree_shapiq_backend.py`).
+`shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `benchmarking/backends/trees/shapiq_backend.py`).
 
 GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/RQ5-gpu/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows.
 
@@ -129,10 +125,6 @@ uv sync
 
 This creates a `.venv` and installs all dependencies from `uv.lock` in one step.
 
-### Run notebooks
-
-Open any notebook under `Libraries/` in Jupyter/VS Code and select the `.venv` created by `uv sync` as its kernel.
-
 ### Run scripts
 
 ```bash
@@ -148,31 +140,23 @@ uv run pytest tests/
 ## Project structure
 
 ```
-Libraries/
-  shapiq.ipynb             # Benchmark baseline
-  shap.ipynb               # Standard SHAP baseline
-  lightshap.ipynb          # Fast tabular attribution, zero-dependency
-  captum.ipynb             # PyTorch attribution (IG, KernelSHAP, …)
-  dalex.ipynb              # iBreakDown, PDP, variable importance
-  alibi.ipynb              # Standalone exploratory comparison — alibi's KernelShap
-  shapleyflow.ipynb / shapleyflow_with.ipynb  # Standalone exploratory comparison — graph-based path decomposition
-  library_merge.ipynb      # Model-agnostic sweep, interactive equivalent of run_benchmark.py
-  tree_library_merge.ipynb # Tree-specific sweep, interactive equivalent of run_benchmark.py --config configs/RQ4-tree/config-tree.yaml
-Models/
-  dataset_and_models.py    # Dataset and Model enums / definitions
-  trainers.py              # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
-  config_parser.py         # load_config / load_dataset_config — expand a config.yaml into parameter lists
-  load_and_train.py        # TrainingConfig — pairs a dataset with a model and exposes train()
-Datasets/
-  load_datasets.py         # Dataset download and caching helpers (support n_features / n_samples)
-  dataset.md               # Dataset documentation incl. encoding strategy and feature-selection notes
-Benchmarking/
-  runner.py                # BenchmarkRunner — runs one oracle + backends/approximations per cell
-  metrics.py                # mean_abs_diff, sign_agreement, mean_sample_rho, runtime
+benchmarking/
+  runner.py                 # BenchmarkRunner — runs one oracle + backends/approximations per cell
+  metrics.py                # mean_abs_diff, sign_agreement, mean_sample_rho, additivity gaps
+  eval_counter.py           # CountingModel — counts real model evaluations per backend
+  timeout.py                # per-backend wall-clock budget
   backends/
-    true_value/            # exact/reference backends (shap, shapiq, lightshap, dalex)
+    true_value/             # exact/reference backends (shap, shapiq, lightshap, dalex)
     approximators/          # approximate backends (shap, shapiq, lightshap, dalex, captum, shap_nn)
     trees/                  # tree-specific backends (shap, shapiq, woodelf, fasttreeshap)
+models/
+  dataset_and_models.py     # Dataset and Model enums / definitions
+  trainers.py               # ModelTrainer ABC; SklearnTrainer and PytorchTrainer implementations
+  architectures.py          # PyTorch architectures (MLP, TabularTransformer, CNN-1D)
+  config_parser.py          # load_config / load_dataset_config — expand a config yaml into parameter lists
+datasets/
+  load_datasets.py          # Dataset download and caching helpers (support n_features / n_samples)
+  README.md                 # Dataset documentation incl. encoding strategy and feature-selection notes
 configs/
   RQ1-accuracy/ … RQ5-gpu/  # one self-contained config per research question — see "Benchmark configuration" above
 slurm/                      # SLURM array-job scripts; see SLURM.md

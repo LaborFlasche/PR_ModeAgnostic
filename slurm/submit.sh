@@ -22,8 +22,8 @@ if [ ! -f "$CONFIG" ]; then
     [ -n "$FOUND" ] && CONFIG="$FOUND"
 fi
 CONFIG_NAME="$(basename "$CONFIG" .yaml)"
-OUTPUT_DIR="Benchmarking/slurm_results/$CONFIG_NAME"
-MERGED_CSV="Benchmarking/results_$CONFIG_NAME.csv"
+OUTPUT_DIR="benchmarking/slurm_results/$CONFIG_NAME"
+MERGED_CSV="benchmarking/results_$CONFIG_NAME.csv"
 
 # Pick the array script once: NN configs use run_benchmark_nn.py, GPU configs
 # (name contains "gpu", e.g. configs/RQ5-gpu/config-tree-gpu.yaml) need a GPU node

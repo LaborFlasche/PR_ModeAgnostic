@@ -7,7 +7,7 @@
 #   - only the fasttreeshap backends are swept; ShapTrueValueBackend (order 1)
 #     and ShapInteractionBackend (order 2) still run implicitly as oracles, so
 #     every row carries pairwise metrics vs the exact reference.
-# Results land in Benchmarking/results_config-tree-fasttreeshap.csv — evaluate
+# Results land in benchmarking/results_config-tree-fasttreeshap.csv — evaluate
 # fasttreeshap from its own rows there; the main tree CSV stays untouched.
 # Prerequisite on the cluster: bash scripts/setup_fasttreeshap_env.sh
 benchmark:

@@ -25,7 +25,7 @@ benchmark:
   # interventional) backends against the GPU=True (cupy-backed) equivalents
   # (gpu_path_dependent/gpu_interventional). The GPU backends are unverified on
   # real GPU hardware — without a CUDA device + cupy they skip to all-NaN rows
-  # (see WoodelfGPU*Backend in Benchmarking/backends/woodelf_backend.py), so this
+  # (see WoodelfGPU*Backend in benchmarking/backends/woodelf_backend.py), so this
   # config is only useful run on a GPU node (see slurm/bench_array_gpu.sh).
   tree_libraries: [woodelf]
   tree_modes: [path_dependent, interventional, gpu_path_dependent, gpu_interventional]

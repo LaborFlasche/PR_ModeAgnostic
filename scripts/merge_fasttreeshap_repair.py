@@ -19,9 +19,9 @@ fasttreeshap backends plus the oracles. This script:
 
 Usage:
     python scripts/merge_fasttreeshap_repair.py \
-        --tree-csv Benchmarking/results_config-tree.csv \
-        --repair-csv Benchmarking/results_config-tree-fasttreeshap.csv \
-        --output-csv Benchmarking/results_config-tree-merged.csv
+        --tree-csv benchmarking/results_config-tree.csv \
+        --repair-csv benchmarking/results_config-tree-fasttreeshap.csv \
+        --output-csv benchmarking/results_config-tree-merged.csv
 """
 import argparse
 import json
@@ -33,7 +33,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Benchmarking.metrics import (  # noqa: E402
+from benchmarking.metrics import (  # noqa: E402
     mean_abs_diff,
     relative_mae,
     sign_agreement,
@@ -84,9 +84,9 @@ def pairwise_dict(candidate: pd.DataFrame, others: dict[str, pd.DataFrame],
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--tree-csv", default="Benchmarking/results_config-tree.csv")
-    parser.add_argument("--repair-csv", default="Benchmarking/results_config-tree-fasttreeshap.csv")
-    parser.add_argument("--output-csv", default="Benchmarking/results_config-tree-merged.csv")
+    parser.add_argument("--tree-csv", default="benchmarking/results_config-tree.csv")
+    parser.add_argument("--repair-csv", default="benchmarking/results_config-tree-fasttreeshap.csv")
+    parser.add_argument("--output-csv", default="benchmarking/results_config-tree-merged.csv")
     parser.add_argument("--oracle-rtol", type=float, default=1e-5,
                         help="Relative tolerance for the identical-model oracle check")
     args = parser.parse_args()

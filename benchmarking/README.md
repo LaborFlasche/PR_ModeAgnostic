@@ -6,12 +6,12 @@ Compares Shapley-value XAI backends on runtime and accuracy across model × data
 
 ## Add a New Backend
 
-1. Create a new file, e.g. `Benchmarking/backends/captum_backend.py`
+1. Create a new file, e.g. `benchmarking/backends/captum_backend.py`
 2. Subclass `BaseBackend`:
 
 ```python
 import pandas as pd
-from Benchmarking.backends.base_backend import BaseBackend, marginal_predict
+from benchmarking.backends.base_backend import BaseBackend, marginal_predict
 
 class CaptumApproxBackend(BaseBackend):
     name = "captum_approx"    # unique string key, appears in CSV
@@ -35,7 +35,7 @@ class CaptumApproxBackend(BaseBackend):
         return pd.DataFrame(attributions, index=x.index, columns=x.columns)
 ```
 
-3. Register in `Benchmarking/backends/__init__.py`.
+3. Register in `benchmarking/backends/__init__.py`.
 
 4. Add it to the runner's `approximation_specs` as `(CaptumApproxBackend, {"approximator": ..., "budget": ...})` (see below).
 
@@ -44,7 +44,8 @@ class CaptumApproxBackend(BaseBackend):
 
 ### On running the benchmarker
 
-See `Libraries/library_merge.ipynb` for an implementation.
+See `slurm/run_benchmark.py` for the driving implementation (one invocation per
+(dataset, model) cell; `slurm/submit.sh` fans it out as a SLURM array job).
 
 The runner takes **one exact oracle** (computed once per cell) plus a list of
 **approximation specs** — `(backend_class, config)` pairs, where `config` carries the
@@ -55,8 +56,8 @@ predict-counter so the real number of model evaluations is recorded.
 > model. Every model here is a tree or linear model, so `shap.Explainer` dispatches to a
 > **polynomial** exact explainer (TreeSHAP / LinearSHAP) that is fast at any feature count.
 > `shapiq`'s `budget = 2^M` brute force is *not* needed as a second oracle — `shapiq`
-> appears only as an *approximation* backend. The polynomial oracle is validated once
-> against brute-force exact in the notebook's "Ground-truth validation" section.
+> appears only as an *approximation* backend. The polynomial oracle was validated once
+> against brute-force exact enumeration.
 
 > **Reproducibility & control via the config.** Two `benchmark` fields in each
 > `configs/RQ*/*.yaml` are the single source of truth for the experiment, with no

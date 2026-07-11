@@ -3,7 +3,7 @@
 Rebuild every row's pairwise_metrics from the stored shapley_values vectors.
 
 Result CSVs written before the spec-qualified pairwise keys existed (see
-Benchmarking.runner.spec_key) keyed entries by backend class name only, so
+benchmarking.runner.spec_key) keyed entries by backend class name only, so
 approximation specs of the same library (kernel vs permutation, different
 budgets) overwrote each other's entries. The stored Shapley matrices are
 complete, so nothing needs re-running: this script regroups rows into their
@@ -32,13 +32,13 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Benchmarking.metrics import (  # noqa: E402
+from benchmarking.metrics import (  # noqa: E402
     mean_abs_diff,
     relative_mae,
     sign_agreement,
     mean_sample_rho,
 )
-from Benchmarking.runner import spec_key  # noqa: E402
+from benchmarking.runner import spec_key  # noqa: E402
 
 # Per-backend output columns (same split as slurm/merge_results.py); everything
 # else identifies the cell, except the trio naming the spec within it.

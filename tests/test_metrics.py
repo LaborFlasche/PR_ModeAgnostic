@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from Benchmarking.metrics import mean_abs_diff, sign_agreement, mean_sample_rho
+from benchmarking.metrics import mean_abs_diff, sign_agreement, mean_sample_rho
 
 
 def _df(arr):

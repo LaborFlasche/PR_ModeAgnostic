@@ -1,6 +1,6 @@
 """Standalone script executed by the dedicated fasttreeshap interpreter (numpy<2),
 not the main project's venv — see scripts/setup_fasttreeshap_env.sh. Deliberately
-self-contained (no import of the Benchmarking package) so the two environments never
+self-contained (no import of the benchmarking package) so the two environments never
 need to agree on anything beyond these few stdlib/pandas/numpy calls.
 
 Usage:
@@ -16,8 +16,8 @@ import pandas as pd
 
 
 def reduce_multiclass(values, order=1):
-    """Mirrors Benchmarking/backends/base_backend.py's reduce_multiclass — kept as a
-    local copy since this script must stay import-free of the Benchmarking package
+    """Mirrors benchmarking/backends/base_backend.py's reduce_multiclass — kept as a
+    local copy since this script must stay import-free of the benchmarking package
     (see module docstring)."""
     if isinstance(values, list):
         idx = 1 if len(values) == 2 else 0

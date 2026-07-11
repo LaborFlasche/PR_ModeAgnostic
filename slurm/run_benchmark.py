@@ -5,7 +5,7 @@ SLURM array worker — runs exactly one (dataset, model) benchmark cell.
 Usage:
     python slurm/run_benchmark.py --task-id $SLURM_ARRAY_TASK_ID
 
-Run from the repo root so that Models/, Benchmarking/, configs/ are importable.
+Run from the repo root so that models/, benchmarking/, configs/ are importable.
 """
 import argparse
 import os
@@ -14,8 +14,8 @@ import warnings
 
 # xgboost/lightgbm must be imported before shapiq anywhere in this process, or a
 # later xgboost/lightgbm .fit() segfaults — establishes safe load order before
-# `from Benchmarking.backends import (...)` pulls in shapiq. Keep these imports
-# at the very top; do not let an import sorter move them below the Benchmarking
+# `from benchmarking.backends import (...)` pulls in shapiq. Keep these imports
+# at the very top; do not let an import sorter move them below the benchmarking
 # imports.
 import xgboost  # noqa: F401,E402  isort:skip
 import lightgbm  # noqa: F401,E402  isort:skip
@@ -23,10 +23,10 @@ import lightgbm  # noqa: F401,E402  isort:skip
 import yaml
 from sklearn.model_selection import ParameterGrid
 
-from Models.config_parser import load_config, load_dataset_config, as_list
-from Models.dataset_and_models import Dataset, Model, actual_max_depth
-from Benchmarking import BenchmarkRunner
-from Benchmarking.backends import (
+from models.config_parser import load_config, load_dataset_config, as_list
+from models.dataset_and_models import Dataset, Model, actual_max_depth
+from benchmarking import BenchmarkRunner
+from benchmarking.backends import (
     ShapTrueValueBackend,
     ShapApproxBackend,
     ShapIQTrueValueBackend,
@@ -57,7 +57,7 @@ warnings.filterwarnings(
     "ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
 
-# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in Benchmarking.backends for
+# GPU backends (WoodelfGPU*, GPUTreeShap*) exist in benchmarking.backends for
 # future use but aren't wired in here yet (XGBoost-only, unverified on real
 # GPU hardware) — only woodelf's GPU=True path is wired below.
 
@@ -138,7 +138,7 @@ def main():
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
     parser.add_argument("--config", required=True,
                         help="Path to the config file used to run the benchmark")
-    parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
+    parser.add_argument("--output-dir", default="benchmarking/slurm_results")
     args = parser.parse_args()
 
     all_runs = build_all_runs(args.config)

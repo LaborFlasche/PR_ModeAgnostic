@@ -208,7 +208,7 @@ class PytorchTrainer(ModelTrainer):
 
     def _build_module(self, in_features: int, out_features: int) -> nn.Module:
         """Instantiate the architecture-specific ``nn.Module``."""
-        from Models.architectures import TabularMLP, TabularTransformer, TabularCNN1D
+        from models.architectures import TabularMLP, TabularTransformer, TabularCNN1D
 
         class_name, accepted = self._ARCH_REGISTRY[self._architecture]
         cls = {"TabularMLP": TabularMLP,

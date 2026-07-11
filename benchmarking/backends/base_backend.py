@@ -44,7 +44,7 @@ def marginal_predict(model, columns):
 
     XGBoost/LightGBM are detected via module name, not isinstance, to avoid
     importing them here — importing xgboost before shapiq segfaults shapiq's
-    interventional TreeExplainer later in the process (see tree_shapiq_backend.py).
+    interventional TreeExplainer later in the process (see trees/shapiq_backend.py).
     LGBMClassifier needs the margin branch just like XGBClassifier: its leaves
     store log-odds, so the shap oracle (and every tree backend) explains the
     margin — but it has no decision_function, so without raw_score=True it would
