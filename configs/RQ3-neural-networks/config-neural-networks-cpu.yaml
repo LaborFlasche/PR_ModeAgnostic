@@ -23,7 +23,6 @@ benchmark:
   proxy_model: xgboost
   # shapiq uses ShapIQTrueValueBackend (TabularExplainer with auto-selected
   # approximator, no explicit approximator sweep).
-  nn_true_value_libraries: [shapiq] # TODO: Delete
   device: cpu # cuda for GPU and cpu for CPU.
 
 models:
