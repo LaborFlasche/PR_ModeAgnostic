@@ -1,11 +1,10 @@
 benchmark:
-  # Single source of truth for all randomness (data subsampling, model training,
-  # and any stochastic approximator) — same meaning as configs/config.yaml's
-  # seed, required here too since slurm/run_benchmark.py reads it unconditionally.
+  # Single source of truth for all randomness (data subsampling, model
+  # training, any stochastic approximator). Required — read unconditionally.
   seed: [0,1,2,3,4,5,6,7,8,9]
-  # Shared value function (only "marginal" is supported) — see configs/config.yaml.
-  # Tree backends don't use this directly, but it's still required since
-  # run_benchmark.py reads it unconditionally for every config.
+  # Shared value function ("marginal" is the only supported value). Tree
+  # backends don't use this directly; kept here for parity with the other RQ
+  # configs, since it's still read unconditionally.
   imputer: marginal
   # Reference background set for the imputer; cost scales with this.
   n_background: 100
@@ -16,8 +15,8 @@ benchmark:
   # stalling the whole sweep. Deep trees (see models.*.max_depth below) can
   # blow up tree-explainer runtime, hence the cap. null = no timeout.
   backend_timeout_s: 600
-  # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
-  # ShapTrueValueBackend (the oracle) still always runs regardless.
+  # Model-agnostic approximation sweep is disabled here; ShapTrueValueBackend
+  # (the oracle) still always runs regardless.
   approx_backends: []
   approximators: []
   budgets: []
@@ -25,8 +24,8 @@ benchmark:
   # interventional) backends against the GPU=True (cupy-backed) equivalents
   # (gpu_path_dependent/gpu_interventional). The GPU backends are unverified on
   # real GPU hardware — without a CUDA device + cupy they skip to all-NaN rows
-  # (see WoodelfGPU*Backend in Benchmarking/backends/woodelf_backend.py), so this
-  # config is only useful run on a GPU node (see slurm/bench_array_gpu.sh).
+  # (see WoodelfGPU*Backend in backends/true_value/trees/woodelf_backend.py),
+  # so this config is only useful run on a GPU node (see slurm/bench_array_gpu.sh).
   tree_libraries: [woodelf]
   tree_modes: [path_dependent, interventional, gpu_path_dependent, gpu_interventional]
   # No order-2 interaction sweep here: WoodelfInteractionBackend has no GPU
@@ -49,7 +48,6 @@ models:
     n_estimators: [100]
     max_depth: [4, 8, 12, 15, 20, 50, 80]
 
-# Same dataset grid as configs/config.yaml.
 datasets:
   gisette:
     n_features: [1000]

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestRegressor
-from Benchmarking.backends.shap_backend import ShapTrueValueBackend
+from backends.true_value.tabular.shap_backend import ShapTrueValueBackend
 
 
 @pytest.fixture
@@ -24,14 +24,14 @@ def test_shap_true_value_shape(toy_rf):
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]
-    backend = ShapTrueValueBackend(model, background)
+    backend = ShapTrueValueBackend(model, background, {"seed": 0})
     contrib = backend.run_explainer(X_eval)
     assert contrib.shape == (5, 3)
 
 
 def test_shap_true_value_columns(toy_rf):
     model, X = toy_rf
-    backend = ShapTrueValueBackend(model, X.iloc[:10])
+    backend = ShapTrueValueBackend(model, X.iloc[:10], {"seed": 0})
     contrib = backend.run_explainer(X.iloc[10:15])
     assert list(contrib.columns) == ["f0", "f1", "f2"]
 
@@ -42,21 +42,21 @@ def test_shap_true_value_metadata():
     assert ShapTrueValueBackend.name == "shap_true_value"
 
 
-from Benchmarking.backends.shapiq_backend import ShapIQTrueValueBackend
+from backends.true_value.tabular.shapiq_backend import ShapIQTrueValueBackend
 
 
 def test_shapiq_true_value_shape(toy_rf):
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:13]
-    backend = ShapIQTrueValueBackend(model, background)
+    backend = ShapIQTrueValueBackend(model, background, {"seed": 0})
     contrib = backend.run_explainer(X_eval)
     assert contrib.shape == (3, 3)
 
 
 def test_shapiq_true_value_columns(toy_rf):
     model, X = toy_rf
-    backend = ShapIQTrueValueBackend(model, X.iloc[:10])
+    backend = ShapIQTrueValueBackend(model, X.iloc[:10], {"seed": 0})
     contrib = backend.run_explainer(X.iloc[10:13])
     assert list(contrib.columns) == ["f0", "f1", "f2"]
 
@@ -67,10 +67,10 @@ def test_shapiq_true_value_metadata():
     assert ShapIQTrueValueBackend.name == "shapiq_true_value"
 
 
-from Benchmarking.backends.tree_shap_backend import ShapTreePathDependentBackend
+from backends.true_value.trees.shap_backend import ShapTreePathDependentBackend
 # ShapIQTreeInterventionalBackend not exercised here: it crashes unreliably (see its docstring).
-from Benchmarking.backends.tree_shapiq_backend import ShapIQTreePathDependentBackend
-from Benchmarking.backends.woodelf_backend import (
+from backends.true_value.trees.shapiq_backend import ShapIQTreePathDependentBackend
+from backends.true_value.trees.woodelf_backend import (
     WoodelfTreePathDependentBackend,
     WoodelfTreeInterventionalBackend,
 )
@@ -108,7 +108,7 @@ def test_woodelf_skips_multiclass():
     assert contrib.isna().all().all()
 
 
-from Benchmarking.backends.fasttreeshap_backend import FastTreeShapBackend
+from backends.true_value.trees.fasttreeshap_backend import FastTreeShapBackend
 
 
 def test_fasttreeshap_skips_when_venv_missing(toy_rf, monkeypatch):
@@ -122,7 +122,7 @@ def test_fasttreeshap_skips_when_venv_missing(toy_rf, monkeypatch):
     assert contrib.isna().all().all()
 
 
-from Models.dataset_and_models import Model
+from models.model import Model
 
 
 def test_model_is_tree():
@@ -152,7 +152,7 @@ class _FakeXGBClassifier:
 
 
 def test_marginal_predict_xgboost_classifier_uses_margin():
-    from Benchmarking.backends.base_backend import marginal_predict
+    from backends.base_backend import marginal_predict
     X = pd.DataFrame(np.zeros((5, 3)), columns=["f0", "f1", "f2"])
     f = marginal_predict(_FakeXGBClassifier(), X.columns)
     np.testing.assert_allclose(f(X), np.arange(5, dtype=float))
@@ -160,9 +160,9 @@ def test_marginal_predict_xgboost_classifier_uses_margin():
 
 # --- Interaction (order-2) backends -----------------------------------------
 
-from Benchmarking.backends.tree_shap_backend import ShapInteractionBackend
-from Benchmarking.backends.tree_shapiq_backend import ShapIQInteractionBackend
-from Benchmarking.backends.woodelf_backend import WoodelfInteractionBackend
+from backends.true_value.trees.shap_backend import ShapInteractionBackend
+from backends.true_value.trees.shapiq_backend import ShapIQInteractionBackend
+from backends.true_value.trees.woodelf_backend import WoodelfInteractionBackend
 
 
 @pytest.mark.parametrize("backend_cls", [
@@ -305,13 +305,9 @@ def test_shapiq_interaction_matches_oracle(toy_rf):
 
 # --- GPU-gated backends: skip-path only (no CUDA on this machine) -----------
 
-from Benchmarking.backends.woodelf_backend import (
+from backends.true_value.trees.woodelf_backend import (
     WoodelfGPUPathDependentBackend,
     WoodelfGPUInterventionalBackend,
-)
-from Benchmarking.backends.gputreeshap_backend import (
-    GPUTreeShapBackend,
-    GPUTreeShapInteractionBackend,
 )
 
 
@@ -320,32 +316,10 @@ from Benchmarking.backends.gputreeshap_backend import (
     WoodelfGPUInterventionalBackend,
 ])
 def test_woodelf_gpu_skips_without_cuda(toy_rf, backend_cls, monkeypatch):
-    monkeypatch.setattr("Benchmarking.backends.woodelf_backend.cuda_available", lambda: False)
+    monkeypatch.setattr("backends.true_value.trees.woodelf_backend.cuda_available", lambda: False)
     model, X = toy_rf
     background = X.iloc[:10]
     X_eval = X.iloc[10:15]
     contrib = backend_cls(model, background).run_explainer(X_eval)
-    assert contrib.shape == (5, 3)
-    assert contrib.isna().all().all()
-
-
-@pytest.mark.parametrize("backend_cls,expected_cols", [
-    (GPUTreeShapBackend, ["f0", "f1", "f2"]),
-    (GPUTreeShapInteractionBackend, [f"{a}__{b}" for a in ["f0", "f1", "f2"] for b in ["f0", "f1", "f2"]]),
-])
-def test_gputreeshap_skips_for_non_xgboost_model(toy_rf, backend_cls, expected_cols):
-    model, X = toy_rf  # toy_rf is a RandomForestRegressor, not XGBoost
-    background = X.iloc[:10]
-    X_eval = X.iloc[10:15]
-    contrib = backend_cls(model, background).run_explainer(X_eval)
-    assert list(contrib.columns) == expected_cols
-    assert contrib.isna().all().all()
-
-
-def test_gputreeshap_skips_xgboost_without_cuda(monkeypatch):
-    monkeypatch.setattr("Benchmarking.backends.gputreeshap_backend.cuda_available", lambda: False)
-    X = pd.DataFrame(np.zeros((5, 3)), columns=["f0", "f1", "f2"])
-    background = X.iloc[:3]
-    contrib = GPUTreeShapBackend(_FakeXGBClassifier(), background).run_explainer(X)
     assert contrib.shape == (5, 3)
     assert contrib.isna().all().all()

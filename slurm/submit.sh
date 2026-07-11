@@ -1,9 +1,8 @@
 #!/bin/bash
-# Run from the repo root:  bash slurm/submit.sh <config_path>
-# e.g. configs/RQ1-accuracy/config-accuracy.yaml (a bare filename is searched
-# for under configs/). Submits one array job plus a merge job that waits for
-# it. Each config gets its own output directory and merged CSV, so different
-# configs can be submitted in parallel without colliding.
+# Run from the repo root: bash slurm/submit.sh <config_path>
+# e.g. configs/RQ1-accuracy/config-accuracy.yaml — each config gets its own
+# output directory and merged CSV, so multiple configs can run in parallel.
+# Submits one array job, then a merge job that waits for it.
 
 set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,19 +20,19 @@ if [ ! -f "$CONFIG" ]; then
     [ -n "$FOUND" ] && CONFIG="$FOUND"
 fi
 CONFIG_NAME="$(basename "$CONFIG" .yaml)"
-OUTPUT_DIR="Benchmarking/slurm_results/$CONFIG_NAME"
-MERGED_CSV="Benchmarking/results_$CONFIG_NAME.csv"
+OUTPUT_DIR="benchmarking/slurm_results/$CONFIG_NAME"
+MERGED_CSV="benchmarking/results_$CONFIG_NAME.csv"
 
 ARRAY_SCRIPT="$(select_array_script "$CONFIG")"
 
+# Count (dataset × model) combinations from the config
 N=$(~/.local/bin/uv run python slurm/count_tasks.py "$CONFIG")
 echo "Submitting $N array tasks for config=$CONFIG (via $ARRAY_SCRIPT)..."
 
 mkdir -p slurm/logs "$OUTPUT_DIR"
 
-# Start each sweep from a clean per-task output dir: workers only overwrite
-# their own results_<task_id>.csv, so a previous sweep with a larger grid or a
-# different schema would leak stale files into the merge.
+# Clean per-task output dir: these files are transient (merged into
+# $MERGED_CSV below); clears stale files left by a previous sweep.
 rm -f "$OUTPUT_DIR"/results_*.csv
 
 ARRAY_JOB=$(sbatch \

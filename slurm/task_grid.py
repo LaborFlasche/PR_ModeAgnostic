@@ -9,7 +9,7 @@ submit exactly len(build_all_runs(config)) array tasks, and the workers
 import yaml
 from sklearn.model_selection import ParameterGrid
 
-from Models.config_parser import load_config, load_dataset_config, as_list
+from benchmarking.config import load_config, load_dataset_config, as_list
 
 
 def load_bench(config_path: str) -> dict:

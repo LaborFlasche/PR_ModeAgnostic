@@ -9,13 +9,10 @@
 # (sinfo: GRES=(null) everywhere), so --gres/--gpus are rejected — the
 # NvidiaAll partition alone provides the node's GPU. CPU NN configs use
 # bench_array_nn_cpu.sh instead (see select_array_script.sh).
-# --array is set dynamically by submit.sh — do not set it here.
-# $1 = config path, $2 = output dir — passed through by submit.sh.
+# --array is set dynamically by submit.sh — do not set it here
+# $1 = config path, $2 = output dir — both passed through by submit.sh so each
+# config writes to its own results directory.
 
-CONFIG="$1"
-if [ -z "$CONFIG" ]; then
-    echo "bench_array_nn.sh: missing config argument" >&2
-    exit 1
-fi
-OUTPUT_DIR="${2:-Benchmarking/slurm_results}"
+CONFIG="${1:-configs/RQ3-neural-networks/config-neural-networks-gpu.yaml}"
+OUTPUT_DIR="${2:-benchmarking/slurm_results}"
 ~/.local/bin/uv run python slurm/run_benchmark_nn.py --task-id "$SLURM_ARRAY_TASK_ID" --config "$CONFIG" --output-dir "$OUTPUT_DIR"

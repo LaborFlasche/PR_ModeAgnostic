@@ -9,7 +9,7 @@ true-value backends that auto-select their approximator (shapiq).
 Usage:
     python slurm/run_benchmark_nn.py --task-id $SLURM_ARRAY_TASK_ID
 
-Run from the repo root so that Models/, Benchmarking/, configs/ are importable.
+Run from the repo root so that models/, benchmarking/, configs/ are importable.
 """
 import argparse
 import json
@@ -21,10 +21,11 @@ warnings.filterwarnings("ignore", message="Not all budget.*", category=UserWarni
 warnings.filterwarnings("ignore", message="The sample size is larger.*", category=UserWarning, module="shapiq")
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated.*", category=UserWarning)
 
-from task_grid import build_all_runs, load_bench
-from Models.dataset_and_models import Dataset, Model
-from Benchmarking import BenchmarkRunner
-from Benchmarking.backends import (
+from slurm.task_grid import build_all_runs, load_bench
+from datasets.load_datasets import Dataset
+from models.model import Model
+from benchmarking import BenchmarkRunner
+from backends import (
     ShapIQTrueValueBackend,
     ShapIQApproxBackend,
     ShapIQNNApproxBackend,
@@ -73,11 +74,11 @@ def build_approx_specs(bench: dict) -> list[tuple]:
 def build_run_meta(*, dataset: str, dataset_params: dict, model: str,
                    n_background: int, device: str,
                    model_params: dict | None = None) -> dict:
-    """Identity metadata for every CSV row of one cell. Records the device —
-    cpu and cuda sweeps of the same config are otherwise indistinguishable in
-    merged results — and flattens dataset and model params (parity with
-    run_benchmark.py's run_meta). Non-scalar model params (e.g. mlp's
-    hidden_sizes list) are JSON-encoded so the CSV cells stay hashable for
+    """Identity metadata for every CSV row of one cell. Records the device
+    (cpu/cuda sweeps of the same config are otherwise indistinguishable in
+    merged results) and flattens dataset/model params, matching
+    run_benchmark.py's run_meta. Non-scalar model params (e.g. mlp's
+    hidden_sizes list) are JSON-encoded so CSV cells stay hashable for
     merge_results.py's drop_duplicates."""
     mp_meta = {k: json.dumps(v) if isinstance(v, (list, dict)) else v
                for k, v in (model_params or {}).items()}
@@ -90,8 +91,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", type=int, required=True,
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
-    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml")
-    parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
+    parser.add_argument("--config", default="configs/RQ3-neural-networks/config-neural-networks-gpu.yaml")
+    parser.add_argument("--output-dir", default="benchmarking/slurm_results")
     args = parser.parse_args()
 
     all_runs = build_all_runs(args.config)
@@ -104,6 +105,10 @@ def main():
           f"| model={model} {model_params} | seed={seed} | n_background={n_background}")
 
     bench = load_bench(args.config)
+
+    imputer = bench["imputer"]
+
+    approx_specs = build_approx_specs(bench)
 
     os.makedirs(args.output_dir, exist_ok=True)
     output_csv = os.path.join(args.output_dir, f"results_{args.task_id:04d}.csv")
@@ -125,12 +130,12 @@ def main():
 
     runner = BenchmarkRunner(
         true_value_backends=true_value_backends,
-        approximation_specs=build_approx_specs(bench),
+        approximation_specs=approx_specs,
         output_csv=output_csv,
         n_background=n_background,
         n_eval=bench["n_eval"],
         seed=seed,
-        imputer=bench["imputer"],
+        imputer=imputer,
         backend_timeout_s=bench.get("backend_timeout_s"),
     )
     runner.run(

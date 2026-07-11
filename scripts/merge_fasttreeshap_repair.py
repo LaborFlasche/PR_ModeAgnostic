@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
 """Merge the fasttreeshap repair sweep back into the main tree results CSV.
 
-The original results_config-tree.csv has all-NaN fasttreeshap rows (the
-dedicated venv was missing on the cluster, see BUGS_TO_FIX.md Bug 5). The
-repair sweep (configs/RQ4-tree/config-tree-fasttreeshap.yaml) reran only the
-fasttreeshap backends plus the oracles. This script:
+Use when results_config-tree.csv has all-NaN fasttreeshap rows because its
+dedicated venv (scripts/setup_fasttreeshap_env.sh) was missing on the cluster
+during the original sweep. Rerun just the fasttreeshap cells via
+configs/RQ4-tree/config-tree-fasttreeshap.yaml, then merge with this script:
 
 1. replaces each cell's NaN fasttreeshap rows with the repaired ones,
-2. recomputes the full pairwise_metrics dict for EVERY row of a repaired cell
-   from the stored shapley_values vectors — so the other backends' rows gain
-   real fasttreeshap entries and the fasttreeshap rows gain entries vs all
-   backends, exactly as if everything had run in one task,
-3. validates per cell that both runs trained the identical model, by requiring
-   the oracle rows' (shap_true_value / shap_interaction) stored values to
-   match; mismatching cells are skipped with a warning,
-4. self-checks the offline metric recomputation by comparing a recomputed
-   already-existing pairwise entry against its stored run-time value.
+2. recomputes pairwise_metrics for every row of a repaired cell from the
+   stored shapley_values vectors, so all backends gain real fasttreeshap
+   comparisons — exactly as if everything had run in one task,
+3. requires the oracle rows' (shap_true_value / shap_interaction) stored
+   values to match between runs, so a repair with a different trained model
+   is skipped with a warning rather than merged,
+4. self-checks by comparing one recomputed pairwise entry against its stored
+   run-time value.
 
 Usage:
     python scripts/merge_fasttreeshap_repair.py \
-        --tree-csv Benchmarking/results_config-tree.csv \
-        --repair-csv Benchmarking/results_config-tree-fasttreeshap.csv \
-        --output-csv Benchmarking/results_config-tree-merged.csv
+        --tree-csv benchmarking/results_config-tree.csv \
+        --repair-csv benchmarking/results_config-tree-fasttreeshap.csv \
+        --output-csv benchmarking/results_config-tree-merged.csv
 """
 import argparse
 import json
@@ -33,7 +32,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Benchmarking.metrics import (  # noqa: E402
+from benchmarking.metrics import (  # noqa: E402
     mean_abs_diff,
     relative_mae,
     sign_agreement,
@@ -84,9 +83,9 @@ def pairwise_dict(candidate: pd.DataFrame, others: dict[str, pd.DataFrame],
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--tree-csv", default="Benchmarking/results_config-tree.csv")
-    parser.add_argument("--repair-csv", default="Benchmarking/results_config-tree-fasttreeshap.csv")
-    parser.add_argument("--output-csv", default="Benchmarking/results_config-tree-merged.csv")
+    parser.add_argument("--tree-csv", default="benchmarking/results_config-tree.csv")
+    parser.add_argument("--repair-csv", default="benchmarking/results_config-tree-fasttreeshap.csv")
+    parser.add_argument("--output-csv", default="benchmarking/results_config-tree-merged.csv")
     parser.add_argument("--oracle-rtol", type=float, default=1e-5,
                         help="Relative tolerance for the identical-model oracle check")
     args = parser.parse_args()

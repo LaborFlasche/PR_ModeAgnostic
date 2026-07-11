@@ -1,12 +1,10 @@
 benchmark:
-  # Single source of truth for all randomness (data subsampling, model training,
-  # and any stochastic approximator) — same meaning as configs/config.yaml's
-  # seed, required here too since slurm/run_benchmark.py reads it unconditionally.
+  # Single source of truth for all randomness (data subsampling, model
+  # training, any stochastic approximator). Required — read unconditionally.
   seed: [0,1,2,3,4,5,6,7,8,9]
-  # Shared value function (only "marginal" is supported) — see configs/config.yaml.
-  # Tree backends don't use this directly (they use their own
-  # path-dependent/interventional distinction via tree_modes below), but it's
-  # still required since run_benchmark.py reads it unconditionally for every config.
+  # Shared value function ("marginal" is the only supported value). Tree
+  # backends use their own path-dependent/interventional distinction (see
+  # tree_modes below) instead; kept here for parity with the other RQ configs.
   imputer: marginal
   # Reference background set for the imputer; cost scales with this.
   n_background: 100
@@ -17,9 +15,8 @@ benchmark:
   # stalling the whole sweep. Deep trees (see models.*.max_depth below) can
   # blow up tree-explainer runtime, hence the cap. null = no timeout.
   backend_timeout_s: 600
-  # Model-agnostic approximation sweep is disabled here — see configs/config.yaml.
-  # No `backends` key either, so no model-agnostic true-value backend runs;
-  # only the tree-specific true-value backends below are used.
+  # Model-agnostic approximation sweep is disabled here, and there's no
+  # `true_backends` key either, so only the tree-specific backends below run.
   approx_backends: []
   approximators: []
   budgets: []
@@ -50,7 +47,6 @@ models:
     n_estimators: [100]
     max_depth: [4, 8, 12, 15, 20, 50, 80]
 
-# Same dataset grid as configs/config.yaml.
 datasets:
   gisette:
     n_features: [1000]

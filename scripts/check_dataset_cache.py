@@ -64,7 +64,7 @@ def main() -> int:
 
     _block_network()
     # Import after the network block so any import-time fetch would be caught too.
-    from Models.dataset_and_models import Dataset
+    from datasets.load_datasets import Dataset
 
     missing: list[str] = []
     for key in keys:

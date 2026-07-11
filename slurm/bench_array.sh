@@ -15,5 +15,5 @@ if [ -z "$CONFIG" ]; then
     echo "bench_array.sh: missing config argument" >&2
     exit 1
 fi
-OUTPUT_DIR="${2:-Benchmarking/slurm_results}"
+OUTPUT_DIR="${2:-benchmarking/slurm_results}"
 ~/.local/bin/uv run python slurm/run_benchmark.py --task-id "$SLURM_ARRAY_TASK_ID" --config "$CONFIG" --output-dir "$OUTPUT_DIR"

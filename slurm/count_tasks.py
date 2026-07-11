@@ -3,12 +3,9 @@
 
 Usage: python slurm/count_tasks.py <config.yaml>"""
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from task_grid import build_all_runs  # noqa: E402
+from slurm.task_grid import build_all_runs
 
 if len(sys.argv) != 2:
     print("Usage: python slurm/count_tasks.py <config.yaml>", file=sys.stderr)

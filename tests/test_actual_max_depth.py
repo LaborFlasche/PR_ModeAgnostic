@@ -1,6 +1,6 @@
 """actual_max_depth must report the realized depth of the fitted model, not
 the configured cap, for every tree model type in the benchmark."""
-# Must precede every other import (Models.trainers pulls in torch), or a later
+# Must precede every other import (models.trainers pulls in torch), or a later
 # xgboost/lightgbm .fit() segfaults — same load-order rule as run_benchmark.py.
 import xgboost  # noqa: F401  isort:skip
 import lightgbm  # noqa: F401  isort:skip
@@ -8,7 +8,8 @@ import lightgbm  # noqa: F401  isort:skip
 import pytest
 from sklearn.datasets import make_regression
 
-from Models.dataset_and_models import Dataset, Model, actual_max_depth
+from datasets.load_datasets import Dataset
+from models.model import Model, actual_max_depth
 
 TREE_MODELS = [m for m in Model if m.is_tree]
 

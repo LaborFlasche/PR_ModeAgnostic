@@ -5,25 +5,24 @@ SLURM array worker — runs exactly one (dataset, model) benchmark cell.
 Usage:
     python slurm/run_benchmark.py --task-id $SLURM_ARRAY_TASK_ID --config <yaml>
 
-Run from the repo root so that Models/, Benchmarking/, configs/ are importable.
+Run from the repo root so that models/, benchmarking/, configs/ are importable.
 """
 import argparse
 import os
 import sys
 import warnings
 
-# xgboost/lightgbm must be imported before shapiq anywhere in this process, or a
-# later xgboost/lightgbm .fit() segfaults — establishes safe load order before
-# `from Benchmarking.backends import (...)` pulls in shapiq. Keep these imports
-# at the very top; do not let an import sorter move them below the Benchmarking
-# imports.
+# xgboost/lightgbm must be imported before shapiq anywhere in this process, or
+# a later .fit() call segfaults. Keep these at the very top — don't let an
+# import sorter move them below `from backends import (...)`.
 import xgboost  # noqa: F401,E402  isort:skip
 import lightgbm  # noqa: F401,E402  isort:skip
 
-from task_grid import build_all_runs, load_bench
-from Models.dataset_and_models import Dataset, Model, actual_max_depth
-from Benchmarking import BenchmarkRunner
-from Benchmarking.backends import (
+from slurm.task_grid import build_all_runs, load_bench
+from datasets.load_datasets import Dataset
+from models.model import Model, actual_max_depth
+from benchmarking import BenchmarkRunner
+from backends import (
     ShapTrueValueBackend,
     ShapApproxBackend,
     ShapIQTrueValueBackend,
@@ -73,10 +72,11 @@ TRUE_VALUE_BACKEND_MAP = {
     "dalex_true_value": DalexTrueBackend,
 }
 
-# Tree-specific true-value backends, only applied to tree models (Model.is_tree),
-# keyed by (library, mode). "gpu_path_dependent"/"gpu_interventional" run
-# woodelf's GPU=True (cupy-backed) path — unverified on real GPU hardware,
-# skips to all-NaN without a CUDA device.
+# Tree-specific true-value backends (Model.is_tree only), keyed by (library,
+# mode). shapiq_tree interventional's exclusion history is in
+# ShapIQTreeInterventionalBackend's docstring. "gpu_path_dependent"/
+# "gpu_interventional" run woodelf's GPU=True (cupy) path — unverified on
+# real GPU hardware, skips to all-NaN without a CUDA device.
 TREE_TRUE_VALUE_MAP = {
     ("shap_tree", "path_dependent"): ShapTreePathDependentBackend,
     ("shapiq_tree", "path_dependent"): ShapIQTreePathDependentBackend,
@@ -186,7 +186,7 @@ def main():
                         help="SLURM_ARRAY_TASK_ID — index into all (dataset, model) combinations")
     parser.add_argument("--config", required=True,
                         help="Path to the config file used to run the benchmark")
-    parser.add_argument("--output-dir", default="Benchmarking/slurm_results")
+    parser.add_argument("--output-dir", default="benchmarking/slurm_results")
     args = parser.parse_args()
 
     all_runs = build_all_runs(args.config)

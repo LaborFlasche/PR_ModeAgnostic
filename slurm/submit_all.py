@@ -12,7 +12,7 @@ Usage (run from repo root, in a persistent session such as tmux/screen):
     python slurm/submit_all.py --configs accuracy dimensionality
     python slurm/submit_all.py --configs tree nn
 
-Available config keys: see CONFIG_REGISTRY below.
+Run with --help for the full list of config keys (CONFIG_REGISTRY below).
 """
 import argparse
 import glob
@@ -24,18 +24,17 @@ import time
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-from task_grid import build_all_runs
+from slurm.task_grid import build_all_runs
 
 MAX_JOBS = 30
 POLL_INTERVAL = 60  # seconds between squeue polls
 
-# "sbatch_args" override slurm/single_task.sh's #SBATCH directives (CLI options
-# take precedence): the nn config runs with device=cuda and the tree-gpu config
-# exercises woodelf's cupy path, so both need a GPU node instead of Krater.
-# The CIP cluster defines no GPU GRES (sinfo shows GRES=(null) on every
-# partition), so --gres/--gpus flags are rejected with "Invalid generic
-# resource specification" — requesting the NvidiaAll partition alone is both
-# necessary and sufficient; the node's GPU is directly visible to the job.
+# "sbatch_args" override single_task.sh's #SBATCH directives (CLI options take
+# precedence): nn (device=cuda) and tree-gpu (woodelf's cupy path) need a GPU
+# node instead of Krater. The CIP cluster defines no GPU GRES (sinfo shows
+# GRES=(null) everywhere), so --gres/--gpus are rejected — the NvidiaAll
+# partition alone is necessary and sufficient; the node's GPU is directly
+# visible to the job.
 CONFIG_REGISTRY = {
     "accuracy": {
         "config": "configs/RQ1-accuracy/config-accuracy.yaml",
@@ -53,19 +52,19 @@ CONFIG_REGISTRY = {
         "config": "configs/RQ4-tree/config-tree.yaml",
         "worker": "slurm/run_benchmark.py",
     },
-    # fasttreeshap-only repair sweep (see BUGS_TO_FIX.md Bug 5); requires
-    # scripts/setup_fasttreeshap_env.sh to have been run on the cluster first.
+    # fasttreeshap-only repair sweep (see config-tree-fasttreeshap.yaml);
+    # requires scripts/setup_fasttreeshap_env.sh to have been run on the cluster first.
     "tree-fasttreeshap": {
         "config": "configs/RQ4-tree/config-tree-fasttreeshap.yaml",
         "worker": "slurm/run_benchmark.py",
     },
     "nn": {
-        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-gpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
     "nn-cpu": {
-        "config": "configs/RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml",
+        "config": "configs/RQ3-neural-networks/config-neural-networks-cpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
     },
     "tree-gpu": {
@@ -82,9 +81,9 @@ CONFIG_REGISTRY = {
 # ---------------------------------------------------------------------------
 
 def count_tasks(config_path: str) -> int:
-    """Number of array tasks — exactly the grid the workers index into via
-    --task-id (task_grid.build_all_runs is the single source of truth)."""
-    return len(build_all_runs(os.path.join(REPO_ROOT, config_path)))
+    """Number of SLURM array tasks for a config — must match the task grid the
+    workers (run_benchmark.py, run_benchmark_nn.py) index into via --task-id."""
+    return len(build_all_runs(config_path))
 
 
 def result_paths(config_key: str) -> tuple[str, str, str]:
@@ -92,8 +91,8 @@ def result_paths(config_key: str) -> tuple[str, str, str]:
     config_path = CONFIG_REGISTRY[config_key]["config"]
     config_name = os.path.basename(config_path).replace(".yaml", "")
     return (config_path,
-            f"Benchmarking/slurm_results/{config_name}",
-            f"Benchmarking/results_{config_name}.csv")
+            f"benchmarking/slurm_results/{config_name}",
+            f"benchmarking/results_{config_name}.csv")
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +194,9 @@ def run(selected: list[str]) -> None:
         cfg, output_dir, _ = result_paths(key)
         n = count_tasks(cfg)
         print(f"  {key:15s} {n:3d} tasks  ({cfg})")
-        # Start from a clean per-task output dir (same as submit.sh): workers only
-        # overwrite their own results_<task_id>.csv, so a previous sweep with a
-        # larger grid would leave higher-numbered files behind and leak stale
-        # rows into the merged CSV.
+        # Clean per-task output dir (same as submit.sh): a previous sweep with
+        # a larger grid would leave stale results_<task_id>.csv files behind,
+        # leaking old rows into the merged CSV.
         output_dir = os.path.join(REPO_ROOT, output_dir)
         os.makedirs(output_dir, exist_ok=True)
         for stale in glob.glob(os.path.join(output_dir, "results_*.csv")):

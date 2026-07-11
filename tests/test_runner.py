@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
-from Benchmarking.runner import BenchmarkRunner
-from Benchmarking.backends.shap_backend import ShapTrueValueBackend
-from Benchmarking.backends.shapiq_backend import ShapIQTrueValueBackend
+from benchmarking.runner import BenchmarkRunner
+from backends.true_value.tabular.shap_backend import ShapTrueValueBackend
+from backends.true_value.tabular.shapiq_backend import ShapIQTrueValueBackend
 
 
 @pytest.fixture
@@ -29,6 +29,7 @@ def runner(tmp_path, toy_rf_data):
         output_csv=str(tmp_path / "results.csv"),
         n_background=100,
         n_eval=None,
+        seed=0,
     ), model, X
 
 

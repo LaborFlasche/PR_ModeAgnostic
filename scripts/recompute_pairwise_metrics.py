@@ -2,19 +2,17 @@
 """
 Rebuild every row's pairwise_metrics from the stored shapley_values vectors.
 
-Result CSVs written before the spec-qualified pairwise keys existed (see
-Benchmarking.runner.spec_key) keyed entries by backend class name only, so
+CSVs written before spec-qualified pairwise keys existed (see
+benchmarking.runner.spec_key) keyed entries by backend class name only, so
 approximation specs of the same library (kernel vs permutation, different
-budgets) overwrote each other's entries. The stored Shapley matrices are
-complete, so nothing needs re-running: this script regroups rows into their
-benchmark cells and recomputes the full pairwise dict per row with the same
-keys a fresh run would emit.
+budgets) overwrote each other. The stored Shapley matrices are complete, so
+nothing needs re-running: this regroups rows into benchmark cells and
+recomputes the full pairwise dict per row with the keys a fresh run would emit.
 
-Order-2 interaction cells pass through untouched — they only ever ran
-distinctly-named true-value backends, so their dicts were never corrupted.
+Order-2 interaction cells pass through untouched (only ran distinctly-named
+true-value backends, so were never corrupted).
 
-Self-check: the old collided entries were valid comparisons, just ambiguously
-keyed, so every stored entry must match one recomputed entry of the same
+Self-check: every stored entry must match one recomputed entry of the same
 backend (reported as max |stored - recomputed| mean_abs_diff, should be ~0;
 NaN-valued stored entries are skipped).
 
@@ -32,21 +30,16 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from Benchmarking.metrics import (  # noqa: E402
+from benchmarking.metrics import (  # noqa: E402
     mean_abs_diff,
     relative_mae,
     sign_agreement,
     mean_sample_rho,
 )
-from Benchmarking.runner import spec_key  # noqa: E402
+from benchmarking.runner import spec_key, RUN_OUTPUT_COLUMNS  # noqa: E402
 
-# Per-backend output columns (same split as slurm/merge_results.py); everything
-# else identifies the cell, except the trio naming the spec within it.
-OUTPUT_COLS = {
-    "library", "computation_type", "n_eval", "runtime_s", "n_model_evals",
-    "additivity_gap", "relative_additivity_gap", "shapley_values",
-    "shapley_n_eval", "shapley_n_features", "pairwise_metrics",
-}
+# Everything besides RUN_OUTPUT_COLUMNS identifies the cell, except the trio
+# naming the spec within it.
 ROW_ID_COLS = {"backend", "approximator", "budget"}
 
 
@@ -96,7 +89,7 @@ def recompute(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Return a copy of df with pairwise_metrics rebuilt for all order-1 cells,
     plus a report dict (cells/rows processed, self-check max deviation)."""
     df = df.copy()
-    cell_cols = [c for c in df.columns if c not in OUTPUT_COLS | ROW_ID_COLS]
+    cell_cols = [c for c in df.columns if c not in RUN_OUTPUT_COLUMNS | ROW_ID_COLS]
     report = {"cells": 0, "rows": 0, "skipped_order2": 0, "max_deviation": 0.0}
 
     for _, cell in df.groupby(cell_cols, dropna=False):

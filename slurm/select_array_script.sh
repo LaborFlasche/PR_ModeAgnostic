@@ -1,6 +1,6 @@
 #!/bin/bash
 # Maps a config path to the SLURM array script that runs it. Sourced by
-# submit.sh; unit-tested by tests/test_select_array_script.sh.
+# submit.sh.
 #
 # NN configs need the NN worker; the "-cpu" NN config must stay on the CPU
 # partition (no GPU wasted), every other NN config trains with device=cuda and

@@ -2,8 +2,8 @@
 """Merges all per-task CSVs from an input directory into a single output CSV.
 
 Usage: python slurm/merge_results.py [--input-dir DIR] [--output-csv FILE]
-Defaults match the original single-config layout (Benchmarking/slurm_results/
--> Benchmarking/results.csv); pass both when merging a tree-config run, whose
+Defaults match the original single-config layout (benchmarking/slurm_results/
+-> benchmarking/results.csv); pass both when merging a tree-config run, whose
 array tasks write to a separate directory (see submit.sh).
 """
 import argparse
@@ -12,11 +12,13 @@ import sys
 
 import pandas as pd
 
+from benchmarking.runner import RUN_OUTPUT_COLUMNS
+
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input-dir", default="Benchmarking/slurm_results")
-    parser.add_argument("--output-csv", default="Benchmarking/results.csv")
+    parser.add_argument("--input-dir", default="benchmarking/slurm_results")
+    parser.add_argument("--output-csv", default="benchmarking/results.csv")
     args = parser.parse_args()
 
     input_glob = f"{args.input_dir}/results_*.csv"
@@ -27,8 +29,8 @@ def main():
 
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
 
-    # Identity = every column that is not a per-run output. Allowlisting
-    # hyperparam columns previously collapsed runs that differed in any other
+    # Identity = every column that isn't a per-run output. Allowlisting
+    # hyperparam columns previously collapsed runs differing in any other
     # swept param (min_samples_split, alpha, NN params, ...) and ignored
     # `order`; deriving the key from the schema keeps every run_meta and sweep
     # column in the identity automatically.

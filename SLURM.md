@@ -13,8 +13,8 @@ below is hardcoded.
 | `dimensionality` | `configs/RQ2-dimensionality/config-dimensionality.yaml` | 480 | Krater | Scalability with feature count |
 | `tree` | `configs/RQ4-tree/config-tree.yaml` | 1050 | Krater | Tree-native backends vs. model-agnostic |
 | `tree-fasttreeshap` | `configs/RQ4-tree/config-tree-fasttreeshap.yaml` | 700 | Krater | fasttreeshap-only repair sweep (needs its own venv, see step 4b) |
-| `nn` | `configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml` | 150 | NvidiaAll | Gradient-based backends for neural networks (device=cuda) |
-| `nn-cpu` | `configs/RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml` | 150 | Krater | Same sweep, device=cpu |
+| `nn` | `configs/RQ3-neural-networks/config-neural-networks-gpu.yaml` | 150 | NvidiaAll | Gradient-based backends for neural networks (device=cuda) |
+| `nn-cpu` | `configs/RQ3-neural-networks/config-neural-networks-cpu.yaml` | 150 | Krater | Same sweep, device=cpu |
 | `tree-gpu` | `configs/RQ5-gpu/config-tree-gpu.yaml` | 1050 | NvidiaAll | woodelf CPU vs. GPU (cupy) backends |
 
 The full config key list is defined in `slurm/submit_all.py`'s `CONFIG_REGISTRY`
@@ -96,7 +96,7 @@ Exit code 0 means every dataset loads offline; 1 lists the missing ones, which
 the snippet below then downloads. Caching is per **dataset** only — the
 `n_features`/`n_samples` sweep values in a config's `datasets:` section are
 applied by subsampling/feature-selecting the already-loaded data in memory
-(`Datasets/load_datasets.py:_load_spec`), so there's no need to fetch a
+(`datasets/load_datasets.py:_load_spec`), so there's no need to fetch a
 separate copy per `(n_features, n_samples)` combination. Run once per unique
 dataset key across **every** config in `configs/*/*.yaml` (not just the
 configs in the table above — this glob matches what
@@ -107,7 +107,7 @@ are added):
 cd ~/PR_ModeAgnostic
 uv run python - <<'EOF'
 import glob, yaml
-from Models.dataset_and_models import Dataset
+from datasets.load_datasets import Dataset
 
 seen = set()
 for cfg_path in sorted(glob.glob("configs/*/*.yaml")):
@@ -191,8 +191,8 @@ Config task counts:
   dimensionality   480 tasks  (configs/RQ2-dimensionality/config-dimensionality.yaml)
   tree            1050 tasks  (configs/RQ4-tree/config-tree.yaml)
   tree-fasttreeshap 700 tasks  (configs/RQ4-tree/config-tree-fasttreeshap.yaml)
-  nn               150 tasks  (configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml)
-  nn-cpu           150 tasks  (configs/RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml)
+  nn               150 tasks  (configs/RQ3-neural-networks/config-neural-networks-gpu.yaml)
+  nn-cpu           150 tasks  (configs/RQ3-neural-networks/config-neural-networks-cpu.yaml)
   tree-gpu        1050 tasks  (configs/RQ5-gpu/config-tree-gpu.yaml)
 
 Total: 3780 tasks | MAX_JOBS=30 | poll every 60s
@@ -230,8 +230,8 @@ bash slurm/submit.sh configs/RQ1-accuracy/config-accuracy.yaml
 bash slurm/submit.sh configs/RQ2-dimensionality/config-dimensionality.yaml
 bash slurm/submit.sh configs/RQ4-tree/config-tree.yaml
 bash slurm/submit.sh config-tree-fasttreeshap.yaml   # bare filename also works
-bash slurm/submit.sh configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml
-bash slurm/submit.sh configs/RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml
+bash slurm/submit.sh configs/RQ3-neural-networks/config-neural-networks-gpu.yaml
+bash slurm/submit.sh configs/RQ3-neural-networks/config-neural-networks-cpu.yaml
 bash slurm/submit.sh configs/RQ5-gpu/config-tree-gpu.yaml
 ```
 
@@ -247,11 +247,11 @@ Each submission:
 1. Counts the task grid via `slurm/count_tasks.py` (same `build_all_runs` logic
    `submit_all.py` uses).
 2. Submits a SLURM **array job** — one task per grid cell, each writing to its
-   own CSV under `Benchmarking/slurm_results/<config_name>/` so there are no
+   own CSV under `benchmarking/slurm_results/<config_name>/` so there are no
    race conditions.
 3. Submits a **merge job** that runs automatically after all array tasks succeed
    (`--dependency=afterok`), combining results into
-   `Benchmarking/results_<config_name>.csv`.
+   `benchmarking/results_<config_name>.csv`.
 
 ---
 
@@ -282,28 +282,28 @@ After the merge job(s) finish, copy the merged CSVs back to your Mac:
 
 ```bash
 # Run this on your Mac
-scp '<cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/Benchmarking/results_config-*.csv' \
-    Benchmarking/
+scp '<cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/benchmarking/results_config-*.csv' \
+    benchmarking/
 ```
 
 Or with rsync:
 
 ```bash
-rsync -avz <cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/Benchmarking/ \
-    Benchmarking/ --include='results_*.csv' --exclude='*'
+rsync -avz <cip-kennung>@remote.cip.ifi.lmu.de:~/PR_ModeAgnostic/benchmarking/ \
+    benchmarking/ --include='results_*.csv' --exclude='*'
 ```
 
 The merged files produced (one per config key, named after the config file):
 
 | File | Config key |
 |------|------------|
-| `Benchmarking/results_config-accuracy.csv` | `accuracy` |
-| `Benchmarking/results_config-dimensionality.csv` | `dimensionality` |
-| `Benchmarking/results_config-tree.csv` | `tree` |
-| `Benchmarking/results_config-tree-fasttreeshap.csv` | `tree-fasttreeshap` |
-| `Benchmarking/results_config-neural-networks-RQ3-gpu.csv` | `nn` |
-| `Benchmarking/results_config-neural-networks-RQ3-cpu.csv` | `nn-cpu` |
-| `Benchmarking/results_config-tree-gpu.csv` | `tree-gpu` |
+| `benchmarking/results_config-accuracy.csv` | `accuracy` |
+| `benchmarking/results_config-dimensionality.csv` | `dimensionality` |
+| `benchmarking/results_config-tree.csv` | `tree` |
+| `benchmarking/results_config-tree-fasttreeshap.csv` | `tree-fasttreeshap` |
+| `benchmarking/results_config-neural-networks-gpu.csv` | `nn` |
+| `benchmarking/results_config-neural-networks-cpu.csv` | `nn-cpu` |
+| `benchmarking/results_config-tree-gpu.csv` | `tree-gpu` |
 
 ---
 
@@ -331,30 +331,30 @@ configs/
 ├── RQ1-accuracy/config-accuracy.yaml                    ← accuracy vs. background size
 ├── RQ2-dimensionality/config-dimensionality.yaml        ← scalability with feature count
 ├── RQ2-dimensionality/config-dimensionality-extreme.yaml← larger extreme-scale variant (not in submit_all.py registry; submit manually via submit.sh)
-├── RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml ← NN sweep, device=cuda
-├── RQ3-neural-networks/config-neural-networks-RQ3-cpu.yaml ← NN sweep, device=cpu
+├── RQ3-neural-networks/config-neural-networks-gpu.yaml ← NN sweep, device=cuda
+├── RQ3-neural-networks/config-neural-networks-cpu.yaml ← NN sweep, device=cpu
 ├── RQ4-tree/config-tree.yaml                            ← tree-native backends vs. model-agnostic
 ├── RQ4-tree/config-tree-fasttreeshap.yaml               ← fasttreeshap-only repair sweep (needs its own venv, step 4b)
 └── RQ5-gpu/config-tree-gpu.yaml                         ← woodelf CPU vs. GPU (cupy) backends
 
-Benchmarking/
+backends/
+└── true_value/{tabular,trees}, approximators/{tabular,neural}  ← one class per (library, mode)
+
+benchmarking/
 ├── runner.py             ← BenchmarkRunner — oracle + approximators per cell
 ├── metrics.py             ← mean_abs_diff, sign_agreement, mean_sample_rho, runtime
-├── backends/               ← approximators/, trees/, true_value/ — one class per (library, mode)
+├── config.py              ← load_config / load_dataset_config — expand a config.yaml into parameter lists
 ├── results_<config_name>.csv  ← merged results per config (after step 5/7)
 └── slurm_results/
     └── <config_name>/          ← per-task CSVs, one dir per config (gitignored)
 
-Models/
-├── dataset_and_models.py ← Dataset/Model enums; Model.is_tree gates the tree-specific sweep
-├── config_parser.py      ← load_config / load_dataset_config — expand a config.yaml into parameter lists
+models/
+├── model.py              ← Model enum; Model.is_tree gates the tree-specific sweep
 ├── architectures.py      ← neural network architectures
-├── load_and_train.py     ← model training entry points
 └── trainers.py            ← SklearnTrainer / PytorchTrainer
 
-Datasets/
+datasets/
 └── load_datasets.py      ← dataset download/caching helpers (used by step 3); Dataset enum lives here
-                             and is re-exported from Models/dataset_and_models.py
 
 scripts/
 ├── check_dataset_cache.py         ← verifies datasets are cached offline (step 3)
@@ -400,13 +400,13 @@ Re-run just that task manually to debug:
 uv run python slurm/run_benchmark.py \
     --task-id <TASKID> \
     --config configs/RQ1-accuracy/config-accuracy.yaml \
-    --output-dir Benchmarking/slurm_results/config-accuracy
+    --output-dir benchmarking/slurm_results/config-accuracy
 
 # NN configs (nn / nn-cpu)
 uv run python slurm/run_benchmark_nn.py \
     --task-id <TASKID> \
-    --config configs/RQ3-neural-networks/config-neural-networks-RQ3-gpu.yaml \
-    --output-dir Benchmarking/slurm_results/config-neural-networks-RQ3-gpu
+    --config configs/RQ3-neural-networks/config-neural-networks-gpu.yaml \
+    --output-dir benchmarking/slurm_results/config-neural-networks-gpu
 ```
 
 Replace the `--config`/`--output-dir` pair with the relevant config from the
@@ -416,8 +416,8 @@ When all tasks are done (including any reruns), merge manually:
 
 ```bash
 uv run python slurm/merge_results.py \
-    --input-dir Benchmarking/slurm_results/config-accuracy \
-    --output-csv Benchmarking/results_config-accuracy.csv
+    --input-dir benchmarking/slurm_results/config-accuracy \
+    --output-csv benchmarking/results_config-accuracy.csv
 ```
 
 Replace `config-accuracy` / `results_config-accuracy` with the relevant config
