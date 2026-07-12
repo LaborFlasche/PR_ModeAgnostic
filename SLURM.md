@@ -1,6 +1,6 @@
 # Running the benchmark on the IFI SLURM cluster
 
-Seven registered configs, **3,780 independent tasks** in total.
+Eight registered configs, **3,784 independent tasks** in total.
 The queue manager (`slurm/submit_all.py`) submits all of them while staying
 within the Krater/NvidiaAll partition limit of **30 jobs** (15 running + 15
 pending). Task counts are always recomputed from the config
@@ -11,11 +11,17 @@ below is hardcoded.
 |------------|------|-------|-----------|----|
 | `accuracy` | `configs/RQ1-accuracy/config-accuracy.yaml` | 200 | Krater | Approximation accuracy vs. background size |
 | `dimensionality` | `configs/RQ2-dimensionality/config-dimensionality.yaml` | 480 | Krater | Scalability with feature count |
+| `dimensionality-extreme` | `configs/RQ2-dimensionality/config-dimensionality-extreme.yaml` | 4 | Krater | Larger extreme-scale variant of `dimensionality` |
 | `tree` | `configs/RQ4-tree/config-tree.yaml` | 1050 | Krater | Tree-native backends vs. model-agnostic |
-| `tree-fasttreeshap` | `configs/RQ4-tree/config-tree-fasttreeshap.yaml` | 700 | Krater | fasttreeshap-only repair sweep (needs its own venv, see step 4b) |
+| `tree-fasttreeshap` | `configs/RQ4-tree/config-tree-fasttreeshap.yaml` | 700 | Krater | fasttreeshap-only **repair** sweep — `tree` already includes fasttreeshap; only submit this separately if you forgot step 4b before running `tree` and got all-NaN fasttreeshap rows |
 | `nn` | `configs/RQ3-neural-networks/config-neural-networks-gpu.yaml` | 150 | NvidiaAll | Gradient-based backends for neural networks (device=cuda) |
 | `nn-cpu` | `configs/RQ3-neural-networks/config-neural-networks-cpu.yaml` | 150 | Krater | Same sweep, device=cpu |
 | `tree-gpu` | `configs/RQ5-gpu/config-tree-gpu.yaml` | 1050 | NvidiaAll | woodelf CPU vs. GPU (cupy) backends |
+
+`--configs all` (the default) submits all eight, including
+`dimensionality-extreme` — `valid = list(CONFIG_REGISTRY)` in
+`slurm/submit_all.py` doesn't special-case it. If you only want the core
+seven-config sweep, pass them explicitly (see "Run a subset of configs" below).
 
 The full config key list is defined in `slurm/submit_all.py`'s `CONFIG_REGISTRY`
 — check there if this table looks stale.
@@ -71,10 +77,8 @@ cd ~/PR_ModeAgnostic
 # Install uv (downloads to ~/.local/bin/uv — no sudo needed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# uv manages Python itself — Ubuntu 24.04 ships 3.12 but the project needs >=3.13
-uv python install 3.13
-
-# Install all dependencies from uv.lock into .venv/
+# uv manages Python itself — the project needs >=3.12 (see .python-version);
+# uv sync fetches it automatically if it isn't already on the system
 uv sync
 ```
 
@@ -154,11 +158,13 @@ line in `slurm/single_task.sh` (used by `submit_all.py`) and in
 > Requesting `--partition=NvidiaAll` alone is sufficient: the node's GPU is
 > directly visible to the job.
 
-### 4b. Extra prerequisite for `tree-fasttreeshap`
+### 4b. Extra prerequisite for fasttreeshap
 
 The fasttreeshap backend needs `numpy<2`, which conflicts with this project's
 main `numpy>=2` environment, so it runs out of its own dedicated venv. Provision
-it once on the login node before submitting `tree-fasttreeshap`:
+it once on the login node **before submitting `tree`** — `tree` already
+includes fasttreeshap (`config-tree.yaml`'s `tree_libraries`), so this is all
+you need to do; there's no separate fasttreeshap config to submit:
 
 ```bash
 bash scripts/setup_fasttreeshap_env.sh
@@ -167,6 +173,14 @@ bash scripts/setup_fasttreeshap_env.sh
 This creates `~/.cache/pr-modeagnostic/.venv-fasttreeshap` (needs `python3.10`
 on PATH, or set `FASTTREESHAP_PYTHON_BIN`). No action needed for the other
 configs.
+
+**If you forgot this** and already submitted `tree`, you don't need to rerun
+the whole sweep — its fasttreeshap cells will just be all-NaN. Instead: run
+`setup_fasttreeshap_env.sh` now, resubmit just the fasttreeshap cells via the
+`tree-fasttreeshap` config (`--configs tree-fasttreeshap`), then backfill the
+repaired rows into the main tree CSV with
+`scripts/merge_fasttreeshap_repair.py` (see its docstring for the exact
+invocation).
 
 ---
 
@@ -189,13 +203,14 @@ The script prints a task summary, then enters a poll loop:
 Config task counts:
   accuracy         200 tasks  (configs/RQ1-accuracy/config-accuracy.yaml)
   dimensionality   480 tasks  (configs/RQ2-dimensionality/config-dimensionality.yaml)
+  dimensionality-extreme   4 tasks  (configs/RQ2-dimensionality/config-dimensionality-extreme.yaml)
   tree            1050 tasks  (configs/RQ4-tree/config-tree.yaml)
   tree-fasttreeshap 700 tasks  (configs/RQ4-tree/config-tree-fasttreeshap.yaml)
   nn               150 tasks  (configs/RQ3-neural-networks/config-neural-networks-gpu.yaml)
   nn-cpu           150 tasks  (configs/RQ3-neural-networks/config-neural-networks-cpu.yaml)
   tree-gpu        1050 tasks  (configs/RQ5-gpu/config-tree-gpu.yaml)
 
-Total: 3780 tasks | MAX_JOBS=30 | poll every 60s
+Total: 3784 tasks | MAX_JOBS=30 | poll every 60s
 ```
 
 It submits up to 30 jobs, then wakes every 60 seconds, detects completions via
@@ -208,15 +223,21 @@ job per config automatically.
 # Only accuracy and dimensionality
 uv run python slurm/submit_all.py --configs accuracy dimensionality
 
-# Only the tree sweeps
-uv run python slurm/submit_all.py --configs tree tree-fasttreeshap
+# Only the tree sweep — make sure scripts/setup_fasttreeshap_env.sh (step 4b)
+# ran first, since `tree` already includes fasttreeshap
+uv run python slurm/submit_all.py --configs tree
+
+# Forgot step 4b before submitting `tree`? Backfill just the fasttreeshap
+# cells instead of rerunning everything (see step 4b for the merge step after):
+uv run python slurm/submit_all.py --configs tree-fasttreeshap
 
 # Only neural networks (both device variants)
 uv run python slurm/submit_all.py --configs nn nn-cpu
 ```
 
-Valid config keys: `accuracy`, `dimensionality`, `tree`, `tree-fasttreeshap`,
-`nn`, `nn-cpu`, `tree-gpu` (see `slurm/submit_all.py --help`).
+Valid config keys: `accuracy`, `dimensionality`, `dimensionality-extreme`,
+`tree`, `tree-fasttreeshap`, `nn`, `nn-cpu`, `tree-gpu` (see
+`slurm/submit_all.py --help`).
 
 ### Submit a single config (legacy, no queue management)
 
@@ -299,6 +320,7 @@ The merged files produced (one per config key, named after the config file):
 |------|------------|
 | `benchmarking/results_config-accuracy.csv` | `accuracy` |
 | `benchmarking/results_config-dimensionality.csv` | `dimensionality` |
+| `benchmarking/results_config-dimensionality-extreme.csv` | `dimensionality-extreme` |
 | `benchmarking/results_config-tree.csv` | `tree` |
 | `benchmarking/results_config-tree-fasttreeshap.csv` | `tree-fasttreeshap` |
 | `benchmarking/results_config-neural-networks-gpu.csv` | `nn` |
@@ -330,7 +352,7 @@ slurm/
 configs/
 ├── RQ1-accuracy/config-accuracy.yaml                    ← accuracy vs. background size
 ├── RQ2-dimensionality/config-dimensionality.yaml        ← scalability with feature count
-├── RQ2-dimensionality/config-dimensionality-extreme.yaml← larger extreme-scale variant (not in submit_all.py registry; submit manually via submit.sh)
+├── RQ2-dimensionality/config-dimensionality-extreme.yaml← larger extreme-scale variant (registered as `dimensionality-extreme`; included in `submit_all.py --configs all`)
 ├── RQ3-neural-networks/config-neural-networks-gpu.yaml ← NN sweep, device=cuda
 ├── RQ3-neural-networks/config-neural-networks-cpu.yaml ← NN sweep, device=cpu
 ├── RQ4-tree/config-tree.yaml                            ← tree-native backends vs. model-agnostic

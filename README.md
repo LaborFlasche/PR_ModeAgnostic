@@ -127,6 +127,14 @@ uv sync
 
 This creates a `.venv` and installs all dependencies from `uv.lock` in one step.
 
+If you plan to run the `fasttreeshap` tree backend, also provision its dedicated
+venv once (it needs `numpy<2`, incompatible with this project's main
+`numpy>=2` stack — see "Tree-specific benchmark" above):
+
+```bash
+bash scripts/setup_fasttreeshap_env.sh
+```
+
 ### Run scripts
 
 ```bash
@@ -138,6 +146,10 @@ uv run python slurm/run_benchmark.py --task-id 0 --config configs/RQ1-accuracy/c
 ```bash
 uv run pytest tests/
 ```
+
+## Slurm
+
+[Slurm](https://slurm.schedmd.com/overview.html) is the workload manager used by the IFI cluster to queue and schedule jobs across compute nodes. See [SLURM.md](SLURM.md) for full instructions on running this benchmark there.
 
 ## Project structure
 
