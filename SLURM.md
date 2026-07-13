@@ -1,6 +1,6 @@
 # Running the benchmark on the IFI SLURM cluster
 
-Eight registered configs, **3,784 independent tasks** in total.
+Twelve registered configs, **4,568 independent tasks** in total.
 The queue manager (`slurm/submit_all.py`) submits all of them while staying
 within the Krater/NvidiaAll partition limit of **30 jobs** (15 running + 15
 pending). Task counts are always recomputed from the config
@@ -12,16 +12,23 @@ below is hardcoded.
 | `accuracy` | `configs/RQ1-accuracy/config-accuracy.yaml` | 200 | Krater | Approximation accuracy vs. background size |
 | `dimensionality` | `configs/RQ2-dimensionality/config-dimensionality.yaml` | 480 | Krater | Scalability with feature count |
 | `dimensionality-extreme` | `configs/RQ2-dimensionality/config-dimensionality-extreme.yaml` | 4 | Krater | Larger extreme-scale variant of `dimensionality` |
+| `dimensionality-repeat` | `configs/RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality.yaml` | 480 | Krater | Repeat run of `dimensionality` |
+| `dimensionality-extreme-repeat` | `configs/RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality-extreme.yaml` | 4 | Krater | Repeat run of `dimensionality-extreme` |
 | `tree` | `configs/RQ4-tree/config-tree.yaml` | 1050 | Krater | Tree-native backends vs. model-agnostic |
 | `tree-fasttreeshap` | `configs/RQ4-tree/config-tree-fasttreeshap.yaml` | 700 | Krater | fasttreeshap-only **repair** sweep — `tree` already includes fasttreeshap; only submit this separately if you forgot step 4b before running `tree` and got all-NaN fasttreeshap rows |
 | `nn` | `configs/RQ3-neural-networks/config-neural-networks-gpu.yaml` | 150 | NvidiaAll | Gradient-based backends for neural networks (device=cuda) |
 | `nn-cpu` | `configs/RQ3-neural-networks/config-neural-networks-cpu.yaml` | 150 | Krater | Same sweep, device=cpu |
+| `nn-repeat` | `configs/RQ3-neural-networks/NN-Repeat/config-neural-networks-gpu.yaml` | 150 | NvidiaAll | Repeat run of `nn` |
+| `nn-cpu-repeat` | `configs/RQ3-neural-networks/NN-Repeat/config-neural-networks-cpu.yaml` | 150 | Krater | Repeat run of `nn-cpu` |
 | `tree-gpu` | `configs/RQ5-gpu/config-tree-gpu.yaml` | 1050 | NvidiaAll | woodelf CPU vs. GPU (cupy) backends |
 
-`--configs all` (the default) submits all eight, including
-`dimensionality-extreme` — `valid = list(CONFIG_REGISTRY)` in
-`slurm/submit_all.py` doesn't special-case it. If you only want the core
-seven-config sweep, pass them explicitly (see "Run a subset of configs" below).
+`--configs all` (the default) submits all twelve. The `*-repeat` configs share
+a filename with their non-repeat counterpart (e.g. both `nn-cpu` and
+`nn-cpu-repeat` point at a file named `config-neural-networks-cpu.yaml`, just
+in different directories), so `CONFIG_REGISTRY` gives them an explicit
+`output_name` override — otherwise their `slurm_results/` dir and merged CSV
+would collide with the original run's. If you only want a specific subset,
+pass the config keys explicitly (see "Run a subset of configs" below).
 
 The full config key list is defined in `slurm/submit_all.py`'s `CONFIG_REGISTRY`
 — check there if this table looks stale.
@@ -140,9 +147,11 @@ cached before submitting.
 sinfo
 ```
 
-`accuracy`, `dimensionality`, `tree`, `tree-fasttreeshap`, and `nn-cpu` are
-CPU-only and run on `Krater` (or any equivalent standard partition, e.g.
-`Gesteine_A`). `nn` and `tree-gpu` need a GPU node — the `NvidiaAll` partition.
+`accuracy`, `dimensionality`, `dimensionality-repeat`, `dimensionality-extreme`,
+`dimensionality-extreme-repeat`, `tree`, `tree-fasttreeshap`, `nn-cpu`, and
+`nn-cpu-repeat` are CPU-only and run on `Krater` (or any equivalent standard
+partition, e.g. `Gesteine_A`). `nn`, `nn-repeat`, and `tree-gpu` need a GPU
+node — the `NvidiaAll` partition.
 `slurm/submit_all.py` routes each config key to the right partition
 automatically via `sbatch_args` in `CONFIG_REGISTRY`; `slurm/select_array_script.sh`
 does the equivalent routing for `submit.sh` (legacy single-config path).
@@ -204,13 +213,17 @@ Config task counts:
   accuracy         200 tasks  (configs/RQ1-accuracy/config-accuracy.yaml)
   dimensionality   480 tasks  (configs/RQ2-dimensionality/config-dimensionality.yaml)
   dimensionality-extreme   4 tasks  (configs/RQ2-dimensionality/config-dimensionality-extreme.yaml)
+  dimensionality-repeat   480 tasks  (configs/RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality.yaml)
+  dimensionality-extreme-repeat   4 tasks  (configs/RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality-extreme.yaml)
   tree            1050 tasks  (configs/RQ4-tree/config-tree.yaml)
   tree-fasttreeshap 700 tasks  (configs/RQ4-tree/config-tree-fasttreeshap.yaml)
   nn               150 tasks  (configs/RQ3-neural-networks/config-neural-networks-gpu.yaml)
   nn-cpu           150 tasks  (configs/RQ3-neural-networks/config-neural-networks-cpu.yaml)
+  nn-repeat        150 tasks  (configs/RQ3-neural-networks/NN-Repeat/config-neural-networks-gpu.yaml)
+  nn-cpu-repeat    150 tasks  (configs/RQ3-neural-networks/NN-Repeat/config-neural-networks-cpu.yaml)
   tree-gpu        1050 tasks  (configs/RQ5-gpu/config-tree-gpu.yaml)
 
-Total: 3784 tasks | MAX_JOBS=30 | poll every 60s
+Total: 4568 tasks | MAX_JOBS=30 | poll every 60s
 ```
 
 It submits up to 30 jobs, then wakes every 60 seconds, detects completions via
@@ -233,11 +246,16 @@ uv run python slurm/submit_all.py --configs tree-fasttreeshap
 
 # Only neural networks (both device variants)
 uv run python slurm/submit_all.py --configs nn nn-cpu
+
+# Repeat runs (e.g. after a backend fix — RQ2/RQ3 Repeat configs)
+uv run python slurm/submit_all.py --configs dimensionality-repeat dimensionality-extreme-repeat
+uv run python slurm/submit_all.py --configs nn-repeat nn-cpu-repeat
 ```
 
 Valid config keys: `accuracy`, `dimensionality`, `dimensionality-extreme`,
-`tree`, `tree-fasttreeshap`, `nn`, `nn-cpu`, `tree-gpu` (see
-`slurm/submit_all.py --help`).
+`dimensionality-repeat`, `dimensionality-extreme-repeat`, `tree`,
+`tree-fasttreeshap`, `nn`, `nn-cpu`, `nn-repeat`, `nn-cpu-repeat`, `tree-gpu`
+(see `slurm/submit_all.py --help`).
 
 ### Submit a single config (legacy, no queue management)
 
@@ -263,6 +281,15 @@ bash slurm/submit.sh configs/RQ5-gpu/config-tree-gpu.yaml
 
 Run any subset — each config gets its own output directory and merged CSV, so
 they never collide.
+
+> **Don't use `submit.sh` for the `*-Repeat` configs.** It derives the output
+> directory/CSV name from the config's basename only (not its full path), and
+> the Repeat configs intentionally reuse their original's filename (e.g.
+> `NN-Repeat/config-neural-networks-cpu.yaml` vs. the top-level
+> `config-neural-networks-cpu.yaml`) — so `submit.sh` would overwrite the
+> original run's `slurm_results/` dir and merged CSV. Use `submit_all.py` with
+> the `*-repeat` config keys instead, which have an explicit `output_name`
+> override to keep them separate.
 
 Each submission:
 1. Counts the task grid via `slurm/count_tasks.py` (same `build_all_runs` logic
@@ -321,10 +348,14 @@ The merged files produced (one per config key, named after the config file):
 | `benchmarking/results_config-accuracy.csv` | `accuracy` |
 | `benchmarking/results_config-dimensionality.csv` | `dimensionality` |
 | `benchmarking/results_config-dimensionality-extreme.csv` | `dimensionality-extreme` |
+| `benchmarking/results_config-dimensionality-repeat.csv` | `dimensionality-repeat` |
+| `benchmarking/results_config-dimensionality-extreme-repeat.csv` | `dimensionality-extreme-repeat` |
 | `benchmarking/results_config-tree.csv` | `tree` |
 | `benchmarking/results_config-tree-fasttreeshap.csv` | `tree-fasttreeshap` |
 | `benchmarking/results_config-neural-networks-gpu.csv` | `nn` |
 | `benchmarking/results_config-neural-networks-cpu.csv` | `nn-cpu` |
+| `benchmarking/results_config-neural-networks-gpu-repeat.csv` | `nn-repeat` |
+| `benchmarking/results_config-neural-networks-cpu-repeat.csv` | `nn-cpu-repeat` |
 | `benchmarking/results_config-tree-gpu.csv` | `tree-gpu` |
 
 ---
@@ -353,8 +384,12 @@ configs/
 ├── RQ1-accuracy/config-accuracy.yaml                    ← accuracy vs. background size
 ├── RQ2-dimensionality/config-dimensionality.yaml        ← scalability with feature count
 ├── RQ2-dimensionality/config-dimensionality-extreme.yaml← larger extreme-scale variant (registered as `dimensionality-extreme`; included in `submit_all.py --configs all`)
+├── RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality.yaml         ← repeat run (registered as `dimensionality-repeat`)
+├── RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality-extreme.yaml ← repeat run (registered as `dimensionality-extreme-repeat`)
 ├── RQ3-neural-networks/config-neural-networks-gpu.yaml ← NN sweep, device=cuda
 ├── RQ3-neural-networks/config-neural-networks-cpu.yaml ← NN sweep, device=cpu
+├── RQ3-neural-networks/NN-Repeat/config-neural-networks-gpu.yaml ← repeat run (registered as `nn-repeat`)
+├── RQ3-neural-networks/NN-Repeat/config-neural-networks-cpu.yaml ← repeat run (registered as `nn-cpu-repeat`)
 ├── RQ4-tree/config-tree.yaml                            ← tree-native backends vs. model-agnostic
 ├── RQ4-tree/config-tree-fasttreeshap.yaml               ← fasttreeshap-only repair sweep (needs its own venv, step 4b)
 └── RQ5-gpu/config-tree-gpu.yaml                         ← woodelf CPU vs. GPU (cupy) backends
@@ -432,7 +467,11 @@ uv run python slurm/run_benchmark_nn.py \
 ```
 
 Replace the `--config`/`--output-dir` pair with the relevant config from the
-table at the top for the other configs.
+table at the top for the other configs. For `*-repeat` keys, use the
+`output_name`-derived directory (e.g. `benchmarking/slurm_results/config-neural-networks-cpu-repeat`
+for `nn-cpu-repeat`, not the config's own basename) — see `result_paths()` in
+`slurm/submit_all.py` if unsure, or just let `submit_all.py` resubmit the
+failed task instead of doing it manually.
 
 When all tasks are done (including any reruns), merge manually:
 

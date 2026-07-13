@@ -72,6 +72,31 @@ CONFIG_REGISTRY = {
         "worker": "slurm/run_benchmark.py",
         "sbatch_args": ["--partition=NvidiaAll"],
     },
+    # *-Repeat configs share a basename with their original (e.g.
+    # NN-Repeat/config-neural-networks-cpu.yaml vs the RQ3 top-level one), so
+    # "output_name" is required here to keep their slurm_results dir/merged
+    # CSV from colliding with the original run's.
+    "dimensionality-repeat": {
+        "config": "configs/RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality.yaml",
+        "worker": "slurm/run_benchmark.py",
+        "output_name": "config-dimensionality-repeat",
+    },
+    "dimensionality-extreme-repeat": {
+        "config": "configs/RQ2-dimensionality/Dimensionality-Repeat/config-dimensionality-extreme.yaml",
+        "worker": "slurm/run_benchmark.py",
+        "output_name": "config-dimensionality-extreme-repeat",
+    },
+    "nn-repeat": {
+        "config": "configs/RQ3-neural-networks/NN-Repeat/config-neural-networks-gpu.yaml",
+        "worker": "slurm/run_benchmark_nn.py",
+        "sbatch_args": ["--partition=NvidiaAll"],
+        "output_name": "config-neural-networks-gpu-repeat",
+    },
+    "nn-cpu-repeat": {
+        "config": "configs/RQ3-neural-networks/NN-Repeat/config-neural-networks-cpu.yaml",
+        "worker": "slurm/run_benchmark_nn.py",
+        "output_name": "config-neural-networks-cpu-repeat",
+    },
 
 }
 
@@ -88,8 +113,9 @@ def count_tasks(config_path: str) -> int:
 
 def result_paths(config_key: str) -> tuple[str, str, str]:
     """(config_path, per-task output dir, merged CSV path) for one config."""
-    config_path = CONFIG_REGISTRY[config_key]["config"]
-    config_name = os.path.basename(config_path).replace(".yaml", "")
+    spec = CONFIG_REGISTRY[config_key]
+    config_path = spec["config"]
+    config_name = spec.get("output_name") or os.path.basename(config_path).replace(".yaml", "")
     return (config_path,
             f"benchmarking/slurm_results/{config_name}",
             f"benchmarking/results_{config_name}.csv")
