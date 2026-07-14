@@ -40,7 +40,7 @@ datasets:
 
   ames_housing:
     n_features: [79]
-    n_samples: [100000]
+    n_samples: [10000]
 
   bike:
     n_features: [12]
