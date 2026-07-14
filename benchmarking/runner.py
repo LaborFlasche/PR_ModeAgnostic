@@ -123,6 +123,8 @@ class BenchmarkRunner:
                 config["seed"] = self.seed
             if self.imputer is not None:
                 config["imputer"] = self.imputer
+            if self.n_eval is not None:
+                config["n_eval"] = self.n_eval
             counter = CountingModel(model)
             result = self._run_backend(cls, counter, background, config, X_eval,
                                        label=f"{cls.name} ({spec})")

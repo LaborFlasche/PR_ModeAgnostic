@@ -79,7 +79,11 @@ class ShapNNApproxBackend(BaseBackend):
         else:
             try:
                 explainer = shap.DeepExplainer(shap_model, baselines)
-                values = explainer.shap_values(x_tensor)
+                # LayerNorm (transformer) isn't a DeepLIFT-supported op, so SHAP's
+                # own additivity sanity check spuriously fails even though the
+                # attributions are otherwise usable; skip that check rather than
+                # discarding the whole row.
+                values = explainer.shap_values(x_tensor, check_additivity=False)
             except Exception:
                 return nan_result(x)
 

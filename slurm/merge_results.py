@@ -34,12 +34,7 @@ def main():
     # swept param (min_samples_split, alpha, NN params, ...) and ignored
     # `order`; deriving the key from the schema keeps every run_meta and sweep
     # column in the identity automatically.
-    output_cols = {
-        "library", "computation_type", "n_eval", "runtime_s", "n_model_evals",
-        "base_value", "additivity_gap", "relative_additivity_gap", "shapley_values",
-        "shapley_n_eval", "shapley_n_features", "pairwise_metrics",
-    }
-    identity_cols = [c for c in df.columns if c not in output_cols]
+    identity_cols = [c for c in df.columns if c not in RUN_OUTPUT_COLUMNS]
     df = df.drop_duplicates(subset=identity_cols, keep="last")
 
     df.to_csv(args.output_csv, index=False)
