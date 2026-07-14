@@ -33,6 +33,17 @@ def _woodelf_gpu_ok() -> tuple[bool, str]:
     return True, ""
 
 
+def _cupy_to_numpy(values):
+    """woodelf's GPU=True path returns cupy arrays (a single array, or a list
+    of them for multiclass) that stay on-device. cupy blocks numpy's implicit
+    array conversion (np.asarray on a cupy array raises TypeError), so results
+    must be moved off-device explicitly via .get() before reduce_multiclass
+    or anything else in this module touches them with numpy."""
+    if isinstance(values, list):
+        return [v.get() if hasattr(v, "get") else v for v in values]
+    return values.get() if hasattr(values, "get") else values
+
+
 def _woodelf_multiclass_unsupported(model) -> bool:
     """True when woodelf's multiclass output is confirmed wrong for this model.
 
@@ -113,6 +124,8 @@ class _WoodelfBackend(BaseBackend):
         try:
             explainer = WoodelfExplainer(self.model, background, GPU=self.gpu)
             values = explainer.shap_values(x)
+            if self.gpu:
+                values = _cupy_to_numpy(values)
         except Exception as e:
             print(f"  [BUG] {self.name} could not run on this model: {e.__class__.__name__}: {e}")
             return nan_result(x)
