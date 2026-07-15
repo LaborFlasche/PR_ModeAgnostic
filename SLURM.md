@@ -1,6 +1,6 @@
 # Running the benchmark on the IFI SLURM cluster
 
-Eight registered configs, **3,784 independent tasks** in total.
+Ten registered configs, **4,084 independent tasks** in total.
 The queue manager (`slurm/submit_all.py`) submits all of them while staying
 within the Krater/NvidiaAll partition limit of **30 jobs** (15 running + 15
 pending). Task counts are always recomputed from the config
@@ -16,9 +16,11 @@ below is hardcoded.
 | `tree-fasttreeshap` | `configs/RQ4-tree/config-tree-fasttreeshap.yaml` | 700 | Krater | fasttreeshap-only **repair** sweep — `tree` already includes fasttreeshap; only submit this separately if you forgot step 4b before running `tree` and got all-NaN fasttreeshap rows |
 | `nn` | `configs/RQ3-neural-networks/config-neural-networks-gpu.yaml` | 150 | NvidiaAll | Gradient-based backends for neural networks (device=cuda) |
 | `nn-cpu` | `configs/RQ3-neural-networks/config-neural-networks-cpu.yaml` | 150 | Krater | Same sweep, device=cpu |
+| `nn-fix` | `configs/RQ3-neural-networks/config-neural-networks-captum-shap-fix-gpu.yaml` | 150 | NvidiaAll | captum/shap_nn-only re-run validating the `budget` wiring fix, device=cuda |
+| `nn-fix-cpu` | `configs/RQ3-neural-networks/config-neural-networks-captum-shap-fix-cpu.yaml` | 150 | Krater | Same re-run, device=cpu |
 | `tree-gpu` | `configs/RQ5-gpu/config-tree-gpu.yaml` | 1050 | NvidiaAll | woodelf CPU vs. GPU (cupy) backends |
 
-`--configs all` (the default) submits all eight, including
+`--configs all` (the default) submits all ten, including
 `dimensionality-extreme` — `valid = list(CONFIG_REGISTRY)` in
 `slurm/submit_all.py` doesn't special-case it. If you only want the core
 seven-config sweep, pass them explicitly (see "Run a subset of configs" below).
@@ -208,9 +210,11 @@ Config task counts:
   tree-fasttreeshap 700 tasks  (configs/RQ4-tree/config-tree-fasttreeshap.yaml)
   nn               150 tasks  (configs/RQ3-neural-networks/config-neural-networks-gpu.yaml)
   nn-cpu           150 tasks  (configs/RQ3-neural-networks/config-neural-networks-cpu.yaml)
+  nn-fix           150 tasks  (configs/RQ3-neural-networks/config-neural-networks-captum-shap-fix-gpu.yaml)
+  nn-fix-cpu       150 tasks  (configs/RQ3-neural-networks/config-neural-networks-captum-shap-fix-cpu.yaml)
   tree-gpu        1050 tasks  (configs/RQ5-gpu/config-tree-gpu.yaml)
 
-Total: 3784 tasks | MAX_JOBS=30 | poll every 60s
+Total: 4084 tasks | MAX_JOBS=30 | poll every 60s
 ```
 
 It submits up to 30 jobs, then wakes every 60 seconds, detects completions via
@@ -233,11 +237,14 @@ uv run python slurm/submit_all.py --configs tree-fasttreeshap
 
 # Only neural networks (both device variants)
 uv run python slurm/submit_all.py --configs nn nn-cpu
+
+# Only the captum/shap_nn budget-wiring-fix re-run (both device variants)
+uv run python slurm/submit_all.py --configs nn-fix nn-fix-cpu
 ```
 
 Valid config keys: `accuracy`, `dimensionality`, `dimensionality-extreme`,
-`tree`, `tree-fasttreeshap`, `nn`, `nn-cpu`, `tree-gpu` (see
-`slurm/submit_all.py --help`).
+`tree`, `tree-fasttreeshap`, `nn`, `nn-cpu`, `nn-fix`, `nn-fix-cpu`, `tree-gpu`
+(see `slurm/submit_all.py --help`).
 
 ### Submit a single config (legacy, no queue management)
 
@@ -325,6 +332,8 @@ The merged files produced (one per config key, named after the config file):
 | `benchmarking/results_config-tree-fasttreeshap.csv` | `tree-fasttreeshap` |
 | `benchmarking/results_config-neural-networks-gpu.csv` | `nn` |
 | `benchmarking/results_config-neural-networks-cpu.csv` | `nn-cpu` |
+| `benchmarking/results_config-neural-networks-captum-shap-fix-gpu.csv` | `nn-fix` |
+| `benchmarking/results_config-neural-networks-captum-shap-fix-cpu.csv` | `nn-fix-cpu` |
 | `benchmarking/results_config-tree-gpu.csv` | `tree-gpu` |
 
 ---
@@ -355,6 +364,8 @@ configs/
 ├── RQ2-dimensionality/config-dimensionality-extreme.yaml← larger extreme-scale variant (registered as `dimensionality-extreme`; included in `submit_all.py --configs all`)
 ├── RQ3-neural-networks/config-neural-networks-gpu.yaml ← NN sweep, device=cuda
 ├── RQ3-neural-networks/config-neural-networks-cpu.yaml ← NN sweep, device=cpu
+├── RQ3-neural-networks/config-neural-networks-captum-shap-fix-gpu.yaml ← captum/shap_nn-only re-run for the budget-wiring fix, device=cuda
+├── RQ3-neural-networks/config-neural-networks-captum-shap-fix-cpu.yaml ← same re-run, device=cpu
 ├── RQ4-tree/config-tree.yaml                            ← tree-native backends vs. model-agnostic
 ├── RQ4-tree/config-tree-fasttreeshap.yaml               ← fasttreeshap-only repair sweep (needs its own venv, step 4b)
 └── RQ5-gpu/config-tree-gpu.yaml                         ← woodelf CPU vs. GPU (cupy) backends

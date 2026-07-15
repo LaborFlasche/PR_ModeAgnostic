@@ -1,0 +1,66 @@
+benchmark:
+  seed: [0,1,2,3,4,5,6,7,8,9]
+  imputer: marginal
+  n_background: 100
+  n_eval: 10
+  # Wall-clock budget per backend run; exceeding it logs [SKIP] and yields an
+  # all-NaN row. null = no timeout.
+  backend_timeout_s: 1800
+  # captum/shap_nn-only re-run to validate the budget-wiring fix in
+  # captum_backend.py/_gradient_shap and shap_nn_backend.py (gradient_shap and
+  # shap_nn's "gradient" approximator now actually spend `budget` as their
+  # sample count instead of silently defaulting to 5/200 regardless of it —
+  # deep_lift_shap/"deep" have no sample-count knob, so they're included here
+  # only for a clean before/after comparison, not because the fix touches them):
+  #   captum  -> gradient_shap, deep_lift_shap  (NN gradient-based)
+  #   shap_nn -> gradient, deep                 (NN gradient-based)
+  approx_backends: [captum, shap_nn]
+  approximators: [gradient_shap, deep_lift_shap, gradient, deep]
+  budgets: [512]
+  device: cpu # cuda for GPU and cpu for CPU.
+
+models:
+  mlp:
+    hidden_sizes: [[128, 64]]
+    epochs: [5]
+    lr: [0.001]
+    batch_size: [64]
+
+  transformer:
+    d_model: [64]
+    nhead: [4]
+    num_layers: [2]
+    epochs: [5]
+    lr: [0.001]
+    batch_size: [64]
+
+  cnn_1d:
+    n_filters: [64]
+    kernel_size: [3]
+    epochs: [5]
+    lr: [0.001]
+    batch_size: [64]
+
+# Fixed feature counts per dataset — no sweep. Neural networks consume all
+# selected features without the budget-driven dimensionality constraints that
+# model-agnostic approximators face.
+datasets:
+  gisette:
+    n_features: [100]
+    n_samples: [1000]
+
+  ames_housing:
+    n_features: [79]
+    n_samples: [1000]
+
+  bike:
+    n_features: [12]
+    n_samples: [1000]
+
+  diabetes_130:
+    n_features: [47]
+    n_samples: [1000]
+
+  covertype:
+    n_features: [54]
+    n_samples: [1000]

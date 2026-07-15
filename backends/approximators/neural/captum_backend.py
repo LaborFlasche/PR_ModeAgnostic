@@ -26,8 +26,10 @@ class CaptumApproxBackend(BaseBackend):
 
     config:
         approximator: "gradient_shap" (default) or "deep_lift_shap"
-        n_eval: (GradientShap only) random samples per baseline, taken from
-            benchmark.n_eval; falls back to 5 if n_eval isn't set
+        budget: (GradientShap only) random interpolation samples per input,
+            passed straight through as n_samples; falls back to 5 if unset.
+            deep_lift_shap has no sample-count knob (it always uses every
+            background row as a baseline), so budget has no effect there.
         stdevs: (GradientShap only) Gaussian noise std added to inputs, default 0.0
         target: output neuron index to explain (required for multi-output models)
     """
@@ -74,7 +76,7 @@ class CaptumApproxBackend(BaseBackend):
         return pd.DataFrame(values, index=x.index, columns=x.columns)
 
     def _gradient_shap(self, model, x, baselines, target):
-        n_samples = self.config.get("n_eval", 5)
+        n_samples = self.config.get("budget", 5)
         stdevs = self.config.get("stdevs", 0.0)
         explainer = GradientShap(model)
         return explainer.attribute(

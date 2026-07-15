@@ -41,6 +41,10 @@ class ShapNNApproxBackend(BaseBackend):
 
     config:
         approximator: "gradient" (GradientExplainer) or "deep" (DeepExplainer)
+        budget: (GradientExplainer only) samples per input, passed straight
+            through as nsamples; falls back to shap's own default of 200 if
+            unset. DeepExplainer has no sample-count knob (it always uses the
+            full background set), so budget has no effect there.
         target: output neuron index to explain (required for multi-output models)
     """
 
@@ -75,7 +79,8 @@ class ShapNNApproxBackend(BaseBackend):
 
         if approximator == "gradient":
             explainer = shap.GradientExplainer(shap_model, baselines)
-            values = explainer.shap_values(x_tensor)
+            nsamples = self.config.get("budget", 200)
+            values = explainer.shap_values(x_tensor, nsamples=nsamples)
         else:
             try:
                 explainer = shap.DeepExplainer(shap_model, baselines)

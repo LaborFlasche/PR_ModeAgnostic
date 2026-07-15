@@ -67,6 +67,17 @@ CONFIG_REGISTRY = {
         "config": "configs/RQ3-neural-networks/config-neural-networks-cpu.yaml",
         "worker": "slurm/run_benchmark_nn.py",
     },
+    # captum/shap_nn-only re-run to validate the budget-wiring fix (see
+    # config-neural-networks-captum-shap-fix-*.yaml) — not part of the core sweep.
+    "nn-fix": {
+        "config": "configs/RQ3-neural-networks/config-neural-networks-captum-shap-fix-gpu.yaml",
+        "worker": "slurm/run_benchmark_nn.py",
+        "sbatch_args": ["--partition=NvidiaAll"],
+    },
+    "nn-fix-cpu": {
+        "config": "configs/RQ3-neural-networks/config-neural-networks-captum-shap-fix-cpu.yaml",
+        "worker": "slurm/run_benchmark_nn.py",
+    },
     "tree-gpu": {
         "config": "configs/RQ5-gpu/config-tree-gpu.yaml",
         "worker": "slurm/run_benchmark.py",
