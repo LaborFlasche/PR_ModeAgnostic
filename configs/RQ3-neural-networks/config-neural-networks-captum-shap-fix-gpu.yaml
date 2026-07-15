@@ -14,7 +14,7 @@ benchmark:
   # only for a clean before/after comparison, not because the fix touches them):
   #   captum  -> gradient_shap, deep_lift_shap  (NN gradient-based)
   #   shap_nn -> gradient, deep                 (NN gradient-based)
-  approx_backends: [captum, shap_nn]
+  approx_backends: [captum]
   approximators: [gradient_shap, deep_lift_shap, gradient, deep]
   budgets: [512]
   device: cuda # cuda for GPU and cpu for CPU.
