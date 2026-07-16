@@ -19,7 +19,7 @@ benchmark:
   # n_model_evals is the comparable axis.
   approx_backends: [shap, shapiq, lightshap, dalex]
   approximators: [kernel, permutation]
-  budgets: [512, 1024]
+  budgets: [520, 1024]
   # Value function every library explains. "marginal" imputes masked features
   # from the background distribution independently. Threaded into every
   # backend (shapiq imputer=, shap masker, lightshap bg_X, dalex background
