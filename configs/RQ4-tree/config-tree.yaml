@@ -50,20 +50,20 @@ models:
 datasets:
   gisette:
     n_features: [1000]
-    n_samples: [1000]
+    n_samples: [10000]
 
   ames_housing:
     n_features: [79]
-    n_samples: [1000]
+    n_samples: [10000]
 
   bike:
     n_features: [12]
-    n_samples: [1000]
+    n_samples: [10000]
 
   diabetes_130:
     n_features: [47]
-    n_samples: [1000]
+    n_samples: [10000]
 
   covertype:
     n_features: [54]
-    n_samples: [1000]
+    n_samples: [10000]
