@@ -84,7 +84,11 @@ class ShapNNApproxBackend(BaseBackend):
         else:
             try:
                 explainer = shap.DeepExplainer(shap_model, baselines)
-                values = explainer.shap_values(x_tensor)
+                # check_additivity's default tolerance (1e-2) is an absolute
+                # diff against the model's raw output, so it spuriously fails
+                # on large-magnitude regression targets (e.g. house prices in
+                # the ~1e5 range) even when the true relative error is ~1e-7.
+                values = explainer.shap_values(x_tensor, check_additivity=False)
             except Exception:
                 return nan_result(x)
 
