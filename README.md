@@ -46,9 +46,9 @@ Each research question has its own self-contained config under `configs/`, group
 |---|---|
 | `configs/RQ1-accuracy/config-accuracy.yaml` | Approximation accuracy vs. budget |
 | `configs/RQ2-dimensionality/config-dimensionality.yaml` (+ `-extreme` variant) | Runtime/accuracy scaling with feature count |
-| `configs/RQ3-neural-networks/config-neural-networks-{cpu,gpu}.yaml` | Gradient-based vs. Shapley-based attribution on PyTorch models |
+| `configs/RQ3-neural-networks/config-neural-networks-gpu.yaml` | Gradient-based vs. Shapley-based attribution on PyTorch models |
 | `configs/RQ4-tree/config-tree.yaml` (+ `-fasttreeshap` variant) | Tree-specific exact/true-value backends |
-| `configs/RQ5-gpu/config-tree-gpu.yaml` | GPU-backed tree backends |
+| `configs/RQ5-gpu/config-neural-networks-{cpu,gpu}.yaml` | Captum/SHAP fix re-run of the RQ3 neural-network sweep |
 
 Each file defines its own `models:` and `datasets:` sections (hyperparameter and sweep ranges) plus a `benchmark:` section (seed, backends, timeouts, …). Use `load_config` and `load_dataset_config` from `benchmarking/config.py` to expand any one of them into all benchmark combinations:
 
@@ -90,6 +90,10 @@ X, y = ds["X"], ds["y"]
 
 Features within each dataset are reduced by ranking on variance and keeping the top `n_features`; samples are subsampled with the benchmark-wide seed (stratified by class for classification tasks, random for regression).
 
+## Results
+
+Final result CSVs from each research question's sweep are checked into `results/`, one subfolder per RQ:
+
 ## Tree-specific benchmark
 
 Tree models (`xgboost`, `lightgbm`, and any sklearn tree model) can additionally be benchmarked against tree-specific exact/true-value SHAP backends, run via a separate config so the model-agnostic sweep above stays untouched:
@@ -109,7 +113,7 @@ uv run python slurm/run_benchmark.py --task-id 0 --config configs/RQ4-tree/confi
 
 `shapiq`'s interventional `TreeExplainer` is excluded: it crashes unreliably in this environment (see `backends/true_value/trees/shapiq_backend.py`).
 
-GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes and exercised by `configs/RQ5-gpu/config-tree-gpu.yaml` (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) — still unverified on real GPU hardware, so without a CUDA device + `cupy` it skips to all-NaN rows.
+GPU-backed `woodelf` (`GPU=True`) is wired into `slurm/run_benchmark.py`'s `TREE_TRUE_VALUE_MAP` under the `gpu_path_dependent`/`gpu_interventional` tree modes (run via `slurm/bench_array_gpu.sh`, which requests a GPU node) but the dedicated `config-tree-gpu.yaml` sweep was dropped from the final RQ set — without a CUDA device + `cupy` it skips to all-NaN rows, and it's unverified on real GPU hardware.
 
 `configs/RQ4-tree/config-tree.yaml`'s `tree_libraries`/`tree_modes`/`interaction_libraries` control which of the above run; `interaction_max_features` caps interaction sweeps since their output is quadratic in feature count.
 
@@ -178,6 +182,8 @@ datasets/
   README.md                 # Dataset documentation incl. encoding strategy and feature-selection notes
 configs/
   RQ1-accuracy/ … RQ5-gpu/  # one self-contained config per research question — see "Benchmark configuration" above
+results/
+  RQ1/ … RQ5/                # final result CSVs per research question
 slurm/                      # SLURM array-job scripts; see SLURM.md
   run_benchmark.py          # entry point: one (dataset, model) cell per invocation (tabular + tree)
   run_benchmark_nn.py       # entry point for the neural-network sweep (captum, shap_nn, shapiq_nn)
